@@ -1,10 +1,13 @@
 
+SUBDIRS = libGIS .
+
 lib_LTLIBRARIES = libmicrotouch3m.la
 
 libmicrotouch3m_la_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_builddir) \
 	-I$(top_srcdir)/src/common \
+	-I$(srcdir)/libGIS \
 	$(NULL)
 
 libmicrotouch3m_la_SOURCES = \
@@ -14,6 +17,7 @@ libmicrotouch3m_la_SOURCES = \
 
 libmicrotouch3m_la_LIBADD = \
 	$(top_builddir)/src/common/libcommon.la \
+	$(builddir)/libGIS/libGIS.la \
 	$(NULL)
 
 libmicrotouch3m_la_LDFLAGS = \

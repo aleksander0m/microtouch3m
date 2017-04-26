@@ -38,6 +38,7 @@ AC_CONFIG_FILES([Makefile
                  src/common/Makefile
                  src/libmicrotouch3m/Makefile
                  src/libmicrotouch3m/microtouch3m.pc
+                 src/libmicrotouch3m/libGIS/Makefile
                  src/microtouch3m-cli/Makefile])
 AC_OUTPUT
 
