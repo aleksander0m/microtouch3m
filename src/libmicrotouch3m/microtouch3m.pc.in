@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=${prefix}/include
+
+Name: microtouch3m
+Description: Library to work with the 3M MicroTouch Controllers
+Version: @VERSION@
+Libs: -L${libdir} -lmicrotouch3m
+Cflags: -I${includedir}/
