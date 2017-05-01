@@ -18,6 +18,7 @@
  * microtouch3m_status_t:
  * @MICROTOUCH3M_STATUS_OK: Operation successful.
  * @MICROTOUCH3M_STATUS_FAILED: Operation failed.
+ * @MICROTOUCH3M_STATUS_NO_MEMORY: Not enough memory.
  * @MICROTOUCH3M_STATUS_INVALID_ARGUMENTS: Invalid arguments.
  * @MICROTOUCH3M_STATUS_INVALID_IO: Invalid I/O.
  * @MICROTOUCH3M_STATUS_INVALID_DATA: Invalid data.
@@ -28,6 +29,7 @@
 typedef enum {
     MICROTOUCH3M_STATUS_OK,
     MICROTOUCH3M_STATUS_FAILED,
+    MICROTOUCH3M_STATUS_NO_MEMORY,
     MICROTOUCH3M_STATUS_INVALID_ARGUMENTS,
     MICROTOUCH3M_STATUS_INVALID_IO,
     MICROTOUCH3M_STATUS_INVALID_DATA,
@@ -43,6 +45,40 @@ typedef enum {
  * Returns: a constant string.
  */
 const char *microtouch3m_status_to_string (microtouch3m_status_t st);
+
+/******************************************************************************/
+/* Library context */
+
+/**
+ * microtouch3m_context_t:
+ *
+ * A opaque type representing the library context.
+ */
+typedef struct microtouch3m_context_s microtouch3m_context_t;
+
+/**
+ * microtouch3m_context_init:
+ * @out_ctx: output location to store a newly allocated #microtouch3m_context_t.
+ *
+ * Initializes the library and creates a newly allocated context.
+ *
+ * The context is only transferred to the user if the returned status is
+ * %MICROTOUCH3M_STATUS_OK.
+ *
+ * When no longer used, the allocated context should be disposed with
+ * microtouch3m_context_free().
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_context_init (microtouch3m_context_t **out_ctx);
+
+/**
+ * microtouch3m_context_free:
+ *
+ * Free a #microtouch3m_context_t that was initialized with
+ * microtouch3m_context_init().
+ */
+void microtouch3m_context_free (microtouch3m_context_t *ctx);
 
 /******************************************************************************/
 /* Firmware files */

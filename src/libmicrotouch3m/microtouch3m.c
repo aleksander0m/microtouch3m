@@ -16,6 +16,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include <libusb.h>
+
 #include "common.h"
 
 #include "microtouch3m.h"
@@ -29,6 +31,7 @@
 static const char *status_str[] = {
     [MICROTOUCH3M_STATUS_OK]                = "success",
     [MICROTOUCH3M_STATUS_FAILED]            = "failed",
+    [MICROTOUCH3M_STATUS_NO_MEMORY]         = "no memory",
     [MICROTOUCH3M_STATUS_INVALID_ARGUMENTS] = "invalid arguments",
     [MICROTOUCH3M_STATUS_INVALID_IO]        = "invalid input/output",
     [MICROTOUCH3M_STATUS_INVALID_DATA]      = "invalid data",
@@ -39,6 +42,44 @@ const char *
 microtouch3m_status_to_string (microtouch3m_status_t st)
 {
     return ((st < (sizeof (status_str) / sizeof (status_str[0]))) ? status_str[st] : "unknown");
+}
+
+/******************************************************************************/
+/* Library context */
+
+struct microtouch3m_context_s {
+    libusb_context *usb;
+};
+
+microtouch3m_status_t
+microtouch3m_context_init (microtouch3m_context_t **out_ctx)
+{
+    microtouch3m_context_t *ctx;
+
+    assert (out_ctx);
+
+    ctx = calloc (1, sizeof (microtouch3m_context_t));
+    if (!ctx)
+        return MICROTOUCH3M_STATUS_NO_MEMORY;
+
+    if (libusb_init (&ctx->usb) != 0) {
+        free (ctx);
+        return MICROTOUCH3M_STATUS_FAILED;
+    }
+
+    *out_ctx = ctx;
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+void
+microtouch3m_context_free (microtouch3m_context_t *ctx)
+{
+    if (!ctx)
+        return;
+
+    if (ctx->usb)
+        libusb_exit (ctx->usb);
+    free (ctx);
 }
 
 /******************************************************************************/

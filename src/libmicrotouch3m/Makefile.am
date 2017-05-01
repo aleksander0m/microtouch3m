@@ -8,6 +8,7 @@ libmicrotouch3m_la_CPPFLAGS = \
 	-I$(top_builddir) \
 	-I$(top_srcdir)/src/common \
 	-I$(srcdir)/libGIS \
+	$(LIBUSB_CFLAGS) \
 	$(NULL)
 
 libmicrotouch3m_la_SOURCES = \
@@ -21,6 +22,7 @@ libmicrotouch3m_la_LIBADD = \
 	$(NULL)
 
 libmicrotouch3m_la_LDFLAGS = \
+	$(LIBUSB_LIBS) \
 	$(NULL)
 
 include_HEADERS = \

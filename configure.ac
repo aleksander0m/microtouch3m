@@ -27,6 +27,11 @@ LT_INIT
 dnl Specific warnings to always use
 MICROTOUCH3M_COMPILER_WARNINGS
 
+dnl Require libusb
+PKG_CHECK_MODULES(LIBUSB, [libusb-1.0])
+AC_SUBST(LIBUSB_CFLAGS)
+AC_SUBST(LIBUSB_LIBS)
+
 dnl libcheck required for unit test support
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.4], [have_check=yes], [have_check=no])
 AM_CONDITIONAL(HAVE_CHECK, test "$have_check" = "yes")
