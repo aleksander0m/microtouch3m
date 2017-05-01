@@ -25,6 +25,16 @@
 
 #include "ihex.h"
 
+#if !defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
+# error GCC built-in atomic method support is required
+#endif
+
+/******************************************************************************/
+/* Common */
+
+#define MICROTOUCH3M_VID 0x0596
+#define MICROTOUCH3M_PID 0x0001
+
 /******************************************************************************/
 /* Status */
 
@@ -48,38 +58,174 @@ microtouch3m_status_to_string (microtouch3m_status_t st)
 /* Library context */
 
 struct microtouch3m_context_s {
+    volatile int    refcount;
     libusb_context *usb;
 };
 
-microtouch3m_status_t
-microtouch3m_context_init (microtouch3m_context_t **out_ctx)
+microtouch3m_context_t *
+microtouch3m_context_new (void)
 {
     microtouch3m_context_t *ctx;
 
-    assert (out_ctx);
-
     ctx = calloc (1, sizeof (microtouch3m_context_t));
     if (!ctx)
-        return MICROTOUCH3M_STATUS_NO_MEMORY;
+        return NULL;
 
     if (libusb_init (&ctx->usb) != 0) {
         free (ctx);
-        return MICROTOUCH3M_STATUS_FAILED;
+        return NULL;
     }
 
-    *out_ctx = ctx;
-    return MICROTOUCH3M_STATUS_OK;
+    ctx->refcount = 1;
+    return ctx;
+}
+
+microtouch3m_context_t *
+microtouch3m_context_ref (microtouch3m_context_t *ctx)
+{
+    assert (ctx);
+    __sync_fetch_and_add (&ctx->refcount, 1);
+    return ctx;
 }
 
 void
-microtouch3m_context_free (microtouch3m_context_t *ctx)
+microtouch3m_context_unref (microtouch3m_context_t *ctx)
 {
-    if (!ctx)
+    assert (ctx);
+    if (__sync_fetch_and_sub (&ctx->refcount, 1) != 1)
         return;
 
-    if (ctx->usb)
-        libusb_exit (ctx->usb);
+    assert (ctx->usb);
+    libusb_exit (ctx->usb);
+
     free (ctx);
+}
+
+/******************************************************************************/
+/* Device */
+
+struct microtouch3m_device_s {
+    volatile int            refcount;
+    microtouch3m_context_t *ctx;
+    libusb_device          *usbdev;
+};
+
+static libusb_device *
+find_usb_device (microtouch3m_context_t *ctx,
+                 uint8_t                 busnum,
+                 uint8_t                 devnum)
+{
+    libusb_device **list = NULL;
+    libusb_device  *found = NULL;
+    unsigned int    i;
+    ssize_t         ret;
+
+    if ((ret = libusb_get_device_list (ctx->usb, &list)) < 0) {
+        microtouch3m_log ("error: couldn't list USB devices: %s", libusb_strerror (ret));
+        return NULL;
+    }
+
+    assert (list);
+    for (i = 0; !found && list[i]; i++) {
+        libusb_device                   *iter;
+        uint8_t                          iter_busnum;
+        uint8_t                          iter_devnum;
+        struct libusb_device_descriptor  desc;
+
+        iter = list[i];
+
+        iter_busnum = libusb_get_bus_number     (iter);
+        if (busnum != iter_busnum || busnum != 0)
+            continue;
+
+        iter_devnum = libusb_get_device_address (iter);
+        if (devnum != iter_devnum || devnum != 0)
+            continue;
+
+        if (libusb_get_device_descriptor (iter, &desc) != 0)
+            continue;
+
+        if (desc.idVendor != MICROTOUCH3M_VID)
+            continue;
+
+        if (desc.idProduct != MICROTOUCH3M_PID)
+            continue;
+
+        found = libusb_ref_device (iter);
+        microtouch3m_log ("found MicroTouch 3M device at %03u:%03u)", iter_busnum, iter_devnum);
+    }
+
+    libusb_free_device_list (list, 1);
+
+    if (!found)
+        microtouch3m_log ("error: couldn't find MicroTouch 3M device at %03u:%03u", busnum, devnum);
+
+    return found;
+}
+
+microtouch3m_device_t *
+microtouch3m_device_new (microtouch3m_context_t *ctx,
+                         uint8_t                 busnum,
+                         uint8_t                 devnum)
+{
+    microtouch3m_device_t *dev;
+    libusb_device         *usbdev;
+
+    dev = calloc (1, sizeof (microtouch3m_device_t));
+    if (!dev)
+        goto outerr;
+
+    usbdev = find_usb_device (ctx, busnum, devnum);
+    if (!usbdev)
+        goto outerr;
+
+    dev->ctx      = microtouch3m_context_ref (ctx);
+    dev->refcount = 1;
+    dev->usbdev   = usbdev;
+    return dev;
+
+outerr:
+    if (usbdev)
+        libusb_unref_device (usbdev);
+    if (dev)
+        free (dev);
+    return NULL;
+}
+
+microtouch3m_device_t *
+microtouch3m_device_ref (microtouch3m_device_t *dev)
+{
+    assert (dev);
+    __sync_fetch_and_add (&dev->refcount, 1);
+    return dev;
+}
+
+void
+microtouch3m_device_unref (microtouch3m_device_t *dev)
+{
+    assert (dev);
+    if (__sync_fetch_and_sub (&dev->refcount, 1) != 1)
+        return;
+
+    assert (dev->usbdev);
+    libusb_unref_device (dev->usbdev);
+
+    assert (dev->ctx);
+    microtouch3m_context_unref (dev->ctx);
+
+    free (dev);
+}
+
+uint8_t
+microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev)
+{
+    return libusb_get_bus_number (dev->usbdev);
+}
+
+uint8_t
+microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev)
+{
+    return libusb_get_device_address (dev->usbdev);
 }
 
 /******************************************************************************/

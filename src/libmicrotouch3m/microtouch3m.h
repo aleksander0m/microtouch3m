@@ -10,6 +10,7 @@
 #define MICROTOUCH3M_H
 
 #include <pthread.h>
+#include <stdint.h>
 
 /******************************************************************************/
 /* Status */
@@ -57,28 +58,110 @@ const char *microtouch3m_status_to_string (microtouch3m_status_t st);
 typedef struct microtouch3m_context_s microtouch3m_context_t;
 
 /**
- * microtouch3m_context_init:
- * @out_ctx: output location to store a newly allocated #microtouch3m_context_t.
+ * microtouch3m_context_new:
  *
  * Initializes the library and creates a newly allocated context.
  *
- * The context is only transferred to the user if the returned status is
- * %MICROTOUCH3M_STATUS_OK.
- *
  * When no longer used, the allocated context should be disposed with
- * microtouch3m_context_free().
+ * microtouch3m_context_unref().
  *
- * Returns: a #microtouch3m_status_t.
+ * Returns: a newly allocated #microtouch3m_context_t.
  */
-microtouch3m_status_t microtouch3m_context_init (microtouch3m_context_t **out_ctx);
+microtouch3m_context_t *microtouch3m_context_new (void);
 
 /**
- * microtouch3m_context_free:
+ * microtouch3m_context_ref:
+ * @ctx: a #microtouch3m_context_t.
  *
- * Free a #microtouch3m_context_t that was initialized with
- * microtouch3m_context_init().
+ * Increases the reference count of a #microtouch3m_context_t.
+ *
+ * Returns: the new full reference.
  */
-void microtouch3m_context_free (microtouch3m_context_t *ctx);
+microtouch3m_context_t *microtouch3m_context_ref (microtouch3m_context_t *ctx);
+
+/**
+ * microtouch3m_context_unref:
+ * @ctx: a #microtouch3m_context_t.
+ *
+ * Decreases the reference count of a #microtouch3m_context_t. It will be fully
+ * disposed when the count reaches 0.
+ */
+void microtouch3m_context_unref (microtouch3m_context_t *ctx);
+
+/******************************************************************************/
+/* Device */
+
+/**
+ * microtouch3m_device_t:
+ *
+ * A opaque type representing a MicroTouch 3M device.
+ */
+typedef struct microtouch3m_device_s microtouch3m_device_t;
+
+/**
+ * microtouch3m_device_new:
+ * @ctx: a #microtouch3m_context_t.
+ * @busnum: bus number, or 0.
+ * @devnum: device number, or 0.
+ *
+ * Creates a new #microtouch3m_device_t to manage the MicroTouch 3M device
+ * available at device address @devnum in bus @busnum.
+ *
+ * @busnum may be 0 if no explicit bus number is requested. If so, all available
+ * buses will be scanned looking for MicroTouch 3M devices.
+ *
+ * @devnum may be 0 if no explicit device address is requested. If so, the first
+ * MicroTouch 3M device found will be considered (if @busnum is given, only the
+ * specific bus will be scanned).
+ *
+ * If more than one MicroTouch 3M device is available in the system, both
+ * @busnum and @devnum should be given for a correct operation.
+ *
+ * When no longer used, the device should be disposed with
+ * microtouch3m_device_unref().
+ *
+ * Returns: a newly allocated #microtouch3m_device_t.
+ */
+microtouch3m_device_t *microtouch3m_device_new (microtouch3m_context_t *ctx,
+                                                uint8_t                 busnum,
+                                                uint8_t                 devnum);
+
+/**
+ * microtouch3m_device_ref:
+ * @dev: a #microtouch3m_device_t.
+ *
+ * Increases the reference count of a #microtouch3m_device_t.
+ *
+ * Returns: the new full reference.
+ */
+microtouch3m_device_t * microtouch3m_device_ref (microtouch3m_device_t *dev);
+
+/**
+ * microtouch3m_device_unref:
+ * @dev: a #microtouch3m_device_t.
+ *
+ * Decreases the reference count of a #microtouch3m_device_t. It will be fully
+ * disposed when the count reaches 0.
+ */
+void microtouch3m_device_unref (microtouch3m_device_t *dev);
+
+/**
+ * microtouch3m_device_get_usb_bus_number:
+ *
+ * Get the USB bus number where this device is available.
+ *
+ * Returns: the USB bus number.
+ */
+uint8_t microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev);
+
+/**
+ * microtouch3m_device_get_usb_device_address:
+ *
+ * Get the USB device address in the bus where this device is available.
+ *
+ * Returns: the USB device address.
+ */
+uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
 
 /******************************************************************************/
 /* Firmware files */
