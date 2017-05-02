@@ -134,12 +134,12 @@ find_usb_device (microtouch3m_context_t *ctx,
 
         iter = list[i];
 
-        iter_busnum = libusb_get_bus_number     (iter);
-        if (busnum != iter_busnum || busnum != 0)
+        iter_busnum = libusb_get_bus_number (iter);
+        if (busnum != iter_busnum && busnum != 0)
             continue;
 
         iter_devnum = libusb_get_device_address (iter);
-        if (devnum != iter_devnum || devnum != 0)
+        if (devnum != iter_devnum && devnum != 0)
             continue;
 
         if (libusb_get_device_descriptor (iter, &desc) != 0)
