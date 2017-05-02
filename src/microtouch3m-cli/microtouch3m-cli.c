@@ -41,6 +41,15 @@ run_validate_fw_file (const char *path)
 }
 
 /******************************************************************************/
+/* ACTION: info */
+
+static int
+run_info (microtouch3m_device_t *dev)
+{
+    return EXIT_SUCCESS;
+}
+
+/******************************************************************************/
 /* Logging */
 
 static pthread_t main_tid;
@@ -65,7 +74,14 @@ print_help (void)
     printf ("\n"
             "Usage: " PROGRAM_NAME " <option>\n"
             "\n"
-            "Firmware options:\n"
+            "Generic device selection options\n"
+            "  -s, --busnum-devnum=[BUS:]DEV    Select device by bus and device number.\n"
+            "  -f, --first                      Select first device found.\n"
+            "\n"
+            "Device actions:\n"
+            "  -i, --info                       Show device information.\n"
+            "\n"
+            "Firmware actions:\n"
             "  -z, --validate-fw-file=[PATH]    Validate firmware file.\n"
             "\n"
             "Common options:\n"
@@ -84,15 +100,66 @@ print_version (void)
             "\n");
 }
 
+static bool
+parse_busnum_devnum (char    *str,
+                     uint8_t *busnum,
+                     uint8_t *devnum)
+{
+    unsigned long  aux;
+    char          *bustmp;
+    char          *devtmp;
+
+    assert (busnum);
+    assert (devnum);
+
+    devtmp = strchr (str, ':');
+    if (devtmp) {
+        bustmp = str;
+        *devtmp = '\0';
+        devtmp++;
+    } else {
+        bustmp = NULL;
+        devtmp = str;
+    }
+
+    aux = strtoul (devtmp, NULL, 10);
+    if (!aux || aux > 0xFF) {
+        fprintf (stderr, "error: invalid DEV value given: '%s'\n", devtmp);
+        return false;
+    }
+    *devnum = (uint8_t) aux;
+
+    if (bustmp) {
+        aux = strtoul (bustmp, NULL, 10);
+        if (!aux || aux > 0xFF) {
+            fprintf (stderr, "error: invalid BUS value given: '%s'\n", bustmp);
+            return false;
+        }
+        *busnum = (uint8_t) aux;
+    } else
+        *busnum = 0;
+
+    return true;
+}
+
 int main (int argc, char **argv)
 {
-    int           idx, iarg = 0;
-    unsigned int  n_actions;
-    char         *validate_fw_file = NULL;
-    bool          debug = false;
-    unsigned int  ret = 0;
+    unsigned int            n_actions;
+    unsigned int            n_actions_require_device;
+    microtouch3m_context_t *ctx              = NULL;
+    microtouch3m_device_t  *dev              = NULL;
+    int                     idx, iarg        = 0;
+    char                   *busnum_devnum    = NULL;
+    bool                    first            = false;
+    bool                    info             = false;
+    char                   *validate_fw_file = NULL;
+    bool                    debug            = false;
+    int                     ret              = EXIT_FAILURE;
 
     const struct option longopts[] = {
+        { "busnum-devnum",    required_argument, 0, 's' },
+        { "first",            no_argument,       0, 'f' },
+        { "info",             no_argument,       0, 'i' },
         { "validate-fw-file", required_argument, 0, 'z' },
         { "debug",            no_argument,       0, 'd' },
         { "version",          no_argument,       0, 'v' },
@@ -103,8 +170,17 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "z:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fiz:dhv", longopts, &idx);
         switch (iarg) {
+        case 's':
+            busnum_devnum = strdup (optarg);
+            break;
+        case 'f':
+            first = true;
+            break;
+        case 'i':
+            info = true;
+            break;
         case 'z':
             validate_fw_file = strdup (optarg);
             break;
@@ -121,7 +197,8 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions = !!(validate_fw_file);
+    n_actions = !!(validate_fw_file) + info;
+    n_actions_require_device = info;
 
     if (n_actions > 1) {
         fprintf (stderr, "error: too many actions requested\n");
@@ -138,11 +215,60 @@ int main (int argc, char **argv)
         microtouch3m_log_set_handler (log_handler);
     }
 
+    /* Initialize library */
+    ctx = microtouch3m_context_new ();
+    if (!ctx) {
+        fprintf (stderr, "error: libmicrotouch3m initialization failed\n");
+        goto out;
+    }
+
+    /* Action requires a valid device */
+    if (n_actions_require_device) {
+        uint8_t busnum = 0;
+        uint8_t devnum = 0;
+
+        if (!first && !busnum_devnum) {
+            fprintf (stderr, "error: no device selection options specified\n");
+            goto out;
+        }
+
+        if (busnum_devnum && !parse_busnum_devnum (busnum_devnum, &busnum, &devnum)) {
+            fprintf (stderr, "error: invalid --busnum-devnum option given\n");
+            goto out;
+        }
+
+        dev = microtouch3m_device_new (ctx, busnum, devnum);
+        if (!dev) {
+            if (first)
+                fprintf (stderr, "error: couldn't find any microtouch 3m device\n");
+            else if (busnum)
+                fprintf (stderr, "error: couldn't find a microtouch 3m device at %03u:%03u\n", busnum, devnum);
+            else if (devnum)
+                fprintf (stderr, "error: couldn't find a microtouch 3m device at address %03u in any USB bus\n", devnum);
+            else
+                assert (0);
+            goto out;
+        }
+
+        printf ("microtouch 3m device found at %03u:%03u",
+                microtouch3m_device_get_usb_bus_number (dev),
+                microtouch3m_device_get_usb_device_address (dev));
+    }
+
     /* Run actions */
     if (validate_fw_file)
         ret = run_validate_fw_file (validate_fw_file);
+    else if (info)
+        ret = run_info (dev);
+    else
+        assert (0);
 
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    microtouch3m_context_unref (ctx);
 
+    free (busnum_devnum);
     free (validate_fw_file);
     return ret;
 }
