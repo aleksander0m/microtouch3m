@@ -253,7 +253,68 @@ ihex_error_to_status (int ihex_error)
 }
 
 microtouch3m_status_t
-microtouch3m_firmware_file_load (const char *path,
+microtouch3m_firmware_file_write (const char    *path,
+                                  const uint8_t *buffer,
+                                  size_t         buffer_size)
+{
+    microtouch3m_status_t  status = MICROTOUCH3M_STATUS_FAILED;
+    FILE                  *f;
+    uint16_t               offset;
+    IHexRecord             record;
+    int                    ihex_ret;
+    static const uint8_t   segment_record_data[2] = { 0 };
+
+    assert (path);
+    assert (buffer);
+
+    if (buffer_size < MICROTOUCH3M_FW_IMAGE_SIZE) {
+        microtouch3m_log ("error: not enough space in buffer to contain the full firmware image file (%zu < %zu)", buffer_size, MICROTOUCH3M_FW_IMAGE_SIZE);
+        status = MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+        goto out;
+    }
+
+    f = fopen (path, "w");
+    if (!f) {
+        microtouch3m_log ("error: opening firmware file failed: %s", strerror (errno));
+        status = MICROTOUCH3M_STATUS_FAILED;
+        goto out;
+    }
+
+    /* Write initial segment record */
+    if (((ihex_ret = New_IHexRecord (IHEX_TYPE_02, 0x0000, segment_record_data, sizeof (segment_record_data), &record)) != IHEX_OK) ||
+        ((ihex_ret = Write_IHexRecord (&record, f)) != IHEX_OK)) {
+        status = ihex_error_to_status (ihex_ret);
+        goto out;
+    }
+
+    /* Write all data records */
+    for (offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += RECORD_DATA_SIZE) {
+        if (((ihex_ret = New_IHexRecord (IHEX_TYPE_00, offset, &buffer[offset], RECORD_DATA_SIZE, &record)) != IHEX_OK) ||
+            ((ihex_ret = Write_IHexRecord (&record, f)) != IHEX_OK)) {
+            status = ihex_error_to_status (ihex_ret);
+            goto out;
+        }
+    }
+
+    /* Write final end-of-file record */
+    if (((ihex_ret = New_IHexRecord (IHEX_TYPE_01, 0x0000, NULL, 0, &record)) != IHEX_OK) ||
+        ((ihex_ret = Write_IHexRecord (&record, f)) != IHEX_OK)) {
+        status = ihex_error_to_status (ihex_ret);
+        goto out;
+    }
+
+    status = MICROTOUCH3M_STATUS_OK;
+
+out:
+
+    if (f)
+        fclose (f);
+
+    return status;
+}
+
+microtouch3m_status_t
+microtouch3m_firmware_file_read (const char *path,
                                  uint8_t    *buffer,
                                  size_t      buffer_size)
 {

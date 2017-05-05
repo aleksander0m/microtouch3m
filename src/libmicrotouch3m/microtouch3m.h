@@ -176,7 +176,7 @@ uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
 #define MICROTOUCH3M_FW_IMAGE_SIZE (size_t) 0x8000
 
 /**
- * microtouch3m_firmware_file_load:
+ * microtouch3m_firmware_file_read:
  * @path: local path to a firmware file.
  * @buffer: buffer where the firmware file contents will be stored, or %NULL to just validate the contents.
  * @buffer_size: if @buffer given, size of @buffer (at least #MICROTOUCH3M_FW_IMAGE_SIZE bytes).
@@ -185,9 +185,26 @@ uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
  *
  * Returns: a #microtouch3m_status_t.
  */
-microtouch3m_status_t microtouch3m_firmware_file_load (const char *path,
+microtouch3m_status_t microtouch3m_firmware_file_read (const char *path,
                                                        uint8_t    *buffer,
                                                        size_t      buffer_size);
+
+/**
+ * microtouch3m_firmware_file_write:
+ * @path: local path to the destination firmware file.
+ * @buffer: buffer where the firmware file contents are stored.
+ * @buffer_size: size of @buffer (at least #MICROTOUCH3M_FW_IMAGE_SIZE bytes).
+ *
+ * Write the firmware contents from @buffer into a file.
+ *
+ * Note that if @buffer_size is bigger than #MICROTOUCH3M_FW_IMAGE_SIZE, the
+ * exceeding bytes will be ignored.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_firmware_file_write (const char    *path,
+                                                        const uint8_t *buffer,
+                                                        size_t         buffer_size);
 
 /******************************************************************************/
 /* Logging */
