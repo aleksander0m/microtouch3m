@@ -31,7 +31,7 @@ run_validate_fw_file (const char *path)
 {
     microtouch3m_status_t st;
 
-    if ((st = microtouch3m_firmware_file_load (path, NULL, 0)) != MICROTOUCH3M_STATUS_OK) {
+    if ((st = microtouch3m_firmware_file_read (path, NULL, 0)) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't validate firmware file: %s\n", microtouch3m_status_to_string (st));
         return EXIT_FAILURE;
     }
@@ -46,6 +46,30 @@ run_validate_fw_file (const char *path)
 static int
 run_info (microtouch3m_device_t *dev)
 {
+    return EXIT_SUCCESS;
+}
+
+/******************************************************************************/
+/* ACTION: firmware dump */
+
+static int
+run_firmware_dump (microtouch3m_device_t *dev,
+                   const char            *path)
+{
+    microtouch3m_status_t st;
+    uint8_t buffer[MICROTOUCH3M_FW_IMAGE_SIZE];
+
+    if ((st = microtouch3m_device_firmware_dump (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't dump device firmware: %s\n", microtouch3m_status_to_string (st));
+        return EXIT_FAILURE;
+    }
+
+    if ((st = microtouch3m_firmware_file_write (path, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't write firmware to file: %s\n", microtouch3m_status_to_string (st));
+        return EXIT_FAILURE;
+    }
+
+    printf ("successfully dumped device firmware\n");
     return EXIT_SUCCESS;
 }
 
@@ -80,6 +104,7 @@ print_help (void)
             "\n"
             "Device actions:\n"
             "  -i, --info                       Show device information.\n"
+            "  -x, --firmware-dump=[PATH]       Dump firmware to a file.\n"
             "\n"
             "Firmware actions:\n"
             "  -z, --validate-fw-file=[PATH]    Validate firmware file.\n"
@@ -152,6 +177,7 @@ int main (int argc, char **argv)
     char                   *busnum_devnum    = NULL;
     bool                    first            = false;
     bool                    info             = false;
+    char                   *firmware_dump    = NULL;
     char                   *validate_fw_file = NULL;
     bool                    debug            = false;
     int                     ret              = EXIT_FAILURE;
@@ -160,6 +186,7 @@ int main (int argc, char **argv)
         { "busnum-devnum",    required_argument, 0, 's' },
         { "first",            no_argument,       0, 'f' },
         { "info",             no_argument,       0, 'i' },
+        { "firmware-dump",    required_argument, 0, 'x' },
         { "validate-fw-file", required_argument, 0, 'z' },
         { "debug",            no_argument,       0, 'd' },
         { "version",          no_argument,       0, 'v' },
@@ -170,7 +197,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fiz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:z:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             busnum_devnum = strdup (optarg);
@@ -180,6 +207,9 @@ int main (int argc, char **argv)
             break;
         case 'i':
             info = true;
+            break;
+        case 'x':
+            firmware_dump = strdup (optarg);
             break;
         case 'z':
             validate_fw_file = strdup (optarg);
@@ -197,8 +227,8 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions = !!(validate_fw_file) + info;
-    n_actions_require_device = info;
+    n_actions = !!(validate_fw_file) + info + !!firmware_dump;
+    n_actions_require_device = info + !!firmware_dump;
 
     if (n_actions > 1) {
         fprintf (stderr, "error: too many actions requested\n");
@@ -250,7 +280,7 @@ int main (int argc, char **argv)
             goto out;
         }
 
-        printf ("microtouch 3m device found at %03u:%03u",
+        printf ("microtouch 3m device found at %03u:%03u\n",
                 microtouch3m_device_get_usb_bus_number (dev),
                 microtouch3m_device_get_usb_device_address (dev));
     }
@@ -260,6 +290,8 @@ int main (int argc, char **argv)
         ret = run_validate_fw_file (validate_fw_file);
     else if (info)
         ret = run_info (dev);
+    else if (firmware_dump)
+        ret = run_firmware_dump (dev, firmware_dump);
     else
         assert (0);
 
@@ -269,6 +301,7 @@ out:
     microtouch3m_context_unref (ctx);
 
     free (busnum_devnum);
+    free (firmware_dump);
     free (validate_fw_file);
     return ret;
 }
