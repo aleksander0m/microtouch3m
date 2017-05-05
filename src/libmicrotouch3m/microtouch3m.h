@@ -147,6 +147,7 @@ void microtouch3m_device_unref (microtouch3m_device_t *dev);
 
 /**
  * microtouch3m_device_get_usb_bus_number:
+ * @dev: a #microtouch3m_device_t.
  *
  * Get the USB bus number where this device is available.
  *
@@ -156,6 +157,7 @@ uint8_t microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev);
 
 /**
  * microtouch3m_device_get_usb_device_address:
+ * @dev: a #microtouch3m_device_t.
  *
  * Get the USB device address in the bus where this device is available.
  *
