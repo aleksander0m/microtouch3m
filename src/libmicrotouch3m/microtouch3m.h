@@ -166,7 +166,7 @@ uint8_t microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev);
 uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
 
 /******************************************************************************/
-/* Firmware files */
+/* Device firmware operations */
 
 /**
  * MICROTOUCH3M_FW_IMAGE_SIZE:
@@ -174,6 +174,23 @@ uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
  * Size of a firmware image file.
  */
 #define MICROTOUCH3M_FW_IMAGE_SIZE (size_t) 0x8000
+
+/**
+ * microtouch3m_device_firmware_dump:
+ * @dev: a #microtouch3m_device_t.
+ * @buffer: buffer where the firmware contents will be stored.
+ * @buffer_size: size of @buffer (at least #MICROTOUCH3M_FW_IMAGE_SIZE bytes).
+ *
+ * Instruct the device to dump the firmware and load it in memory.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
+                                                         uint8_t               *buffer,
+                                                         size_t                 buffer_size);
+
+/******************************************************************************/
+/* Firmware files */
 
 /**
  * microtouch3m_firmware_file_read:

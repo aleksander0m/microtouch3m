@@ -229,6 +229,99 @@ microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev)
 }
 
 /******************************************************************************/
+/* Device firmware operations */
+
+enum request_e {
+    REQUEST_GET_PARAMETER = 0x02,
+    REQUEST_SET_PARAMETER = 0x03,
+};
+
+enum parameter_e {
+    PARAMETER_CONTROLLER_EEPROM = 0x0020,
+};
+
+struct read_message_s {
+    uint8_t  id;
+    uint16_t size;
+    uint8_t  buffer [64];
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
+                                   uint8_t               *buffer,
+                                   size_t                 buffer_size)
+{
+    libusb_device_handle  *handle = NULL;
+    microtouch3m_status_t  st;
+    uint16_t               offset;
+    unsigned int           i;
+    struct read_message_s  read_message;
+
+    assert (dev);
+    assert (buffer);
+
+    if (buffer_size < MICROTOUCH3M_FW_IMAGE_SIZE) {
+        microtouch3m_log ("error: not enough space in buffer to contain the full firmware image file (%zu < %zu)",
+                          buffer_size, MICROTOUCH3M_FW_IMAGE_SIZE);
+        st = MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+        goto out;
+    }
+
+    if (libusb_open (dev->usbdev, &handle) < 0) {
+        microtouch3m_log ("error: couldn't open usb device");
+        st = MICROTOUCH3M_STATUS_FAILED;
+        goto out;
+    }
+
+    microtouch3m_log ("reading firmware from controller EEPROM...");
+
+    for (i = 0, offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += sizeof (read_message.buffer), i++) {
+        int desc_size;
+
+        memset (&read_message, 0, sizeof (read_message));
+        if ((desc_size = libusb_control_transfer (handle,
+                                                  LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+                                                  REQUEST_GET_PARAMETER,
+                                                  PARAMETER_CONTROLLER_EEPROM,
+                                                  offset,
+                                                  (uint8_t *) &read_message,
+                                                  sizeof (read_message),
+                                                  5000)) < 0) {
+            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: control transfer failure",
+                              offset);
+            st = MICROTOUCH3M_STATUS_INVALID_IO;
+            goto out;
+        }
+
+        if (desc_size != sizeof (read_message)) {
+            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: invalid data size read (%d != %d)",
+                              offset, desc_size, sizeof (read_message));
+            st = MICROTOUCH3M_STATUS_INVALID_DATA;
+            goto out;
+        }
+
+        if (read_message.size != sizeof (read_message.buffer)) {
+            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: invalid read data size reported (%d != %d)",
+                              offset, read_message.size, sizeof (read_message.buffer));
+            st = MICROTOUCH3M_STATUS_INVALID_FORMAT;
+            goto out;
+        }
+
+        microtouch3m_log ("  read byte range: [0x%04x,0x%04x]...", offset, offset + sizeof (read_message.buffer) - 1);
+        memcpy (&buffer[offset], read_message.buffer, sizeof (read_message.buffer));
+    }
+
+    /* Success! */
+    microtouch3m_log ("successfully read firmware from controller EEPROM");
+    st = MICROTOUCH3M_STATUS_OK;
+
+out:
+    if (handle)
+        libusb_close (handle);
+    return st;
+}
+
+/******************************************************************************/
 /* Firmware files */
 
 #define RECORD_DATA_SIZE        16
