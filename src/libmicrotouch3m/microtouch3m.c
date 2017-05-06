@@ -229,21 +229,84 @@ microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev)
 }
 
 /******************************************************************************/
-/* Device firmware operations */
+/* Parameter block management */
 
 enum request_e {
     REQUEST_GET_PARAMETER = 0x02,
     REQUEST_SET_PARAMETER = 0x03,
 };
 
-enum parameter_e {
-    PARAMETER_CONTROLLER_EEPROM = 0x0020,
+enum parameter_id_e {
+    PARAMETER_ID_CONTROLLER_NOVRAM = 0x0000,
+    PARAMETER_ID_CONTROLLER_EEPROM = 0x0020,
 };
 
-struct read_message_s {
-    uint8_t  id;
-    uint16_t size;
-    uint8_t  buffer [64];
+enum report_id_e {
+    REPORT_ID_PARAMETER = 0x04,
+};
+
+struct parameter_report_s {
+    uint8_t  report_id;
+    uint16_t data_size;
+    uint8_t  data [];
+} __attribute__((packed));
+
+static microtouch3m_status_t
+read_parameter_block (microtouch3m_device_t     *dev,
+                      libusb_device_handle      *handle,
+                      uint16_t                   parameter_value,
+                      uint16_t                   parameter_index,
+                      struct parameter_report_s *parameter_report,
+                      size_t                     parameter_report_size)
+{
+    int desc_size;
+
+    assert (dev);
+    assert (handle);
+    assert (parameter_report);
+
+    if ((desc_size = libusb_control_transfer (handle,
+                                              LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+                                              REQUEST_GET_PARAMETER,
+                                              parameter_value,
+                                              parameter_index,
+                                              (uint8_t *) parameter_report,
+                                              parameter_report_size,
+                                              5000)) < 0) {
+        microtouch3m_log ("error: couldn't read parameter value 0x%04x index 0x%04x", parameter_value, parameter_index);
+        return MICROTOUCH3M_STATUS_INVALID_IO;
+    }
+
+    if (desc_size != parameter_report_size) {
+        microtouch3m_log ("error: couldn't read parameter value 0x%04x index 0x%04x: invalid data size read (%d != %d)",
+                          parameter_value, parameter_index, desc_size, parameter_report_size);
+        return MICROTOUCH3M_STATUS_INVALID_DATA;
+    }
+
+    if (parameter_report->report_id != REPORT_ID_PARAMETER) {
+        microtouch3m_log ("error: couldn't read parameter value 0x%04x index 0x%04x: invalid report id (%d != %d)",
+                          parameter_value, parameter_index, parameter_report->report_id, REPORT_ID_PARAMETER);
+        return MICROTOUCH3M_STATUS_INVALID_DATA;
+    }
+
+    if (parameter_report->data_size != (parameter_report_size - sizeof (struct parameter_report_s))) {
+        microtouch3m_log ("error: couldn't read parameter value 0x%04x index 0x%04x: invalid read data size reported (%d != %d)",
+                          parameter_value, parameter_index, parameter_report->data_size, (parameter_report_size - sizeof (struct parameter_report_s)));
+        return MICROTOUCH3M_STATUS_INVALID_FORMAT;
+    }
+
+    microtouch3m_log ("read parameter value 0x%04x index 0x%04x", parameter_value, parameter_index);
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Firmware dump */
+
+#define PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE 64
+
+struct parameter_report_firmware_dump_s {
+    struct parameter_report_s header;
+    uint8_t                   data [PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE];
 } __attribute__((packed));
 
 microtouch3m_status_t
@@ -255,7 +318,6 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
     microtouch3m_status_t  st;
     uint16_t               offset;
     unsigned int           i;
-    struct read_message_s  read_message;
 
     assert (dev);
     assert (buffer);
@@ -275,40 +337,18 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
 
     microtouch3m_log ("reading firmware from controller EEPROM...");
 
-    for (i = 0, offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += sizeof (read_message.buffer), i++) {
-        int desc_size;
+    for (i = 0, offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE, i++) {
+        struct parameter_report_firmware_dump_s parameter_report;
 
-        memset (&read_message, 0, sizeof (read_message));
-        if ((desc_size = libusb_control_transfer (handle,
-                                                  LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
-                                                  REQUEST_GET_PARAMETER,
-                                                  PARAMETER_CONTROLLER_EEPROM,
-                                                  offset,
-                                                  (uint8_t *) &read_message,
-                                                  sizeof (read_message),
-                                                  5000)) < 0) {
-            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: control transfer failure",
-                              offset);
-            st = MICROTOUCH3M_STATUS_INVALID_IO;
+        if ((st = read_parameter_block (dev,
+                                        handle,
+                                        PARAMETER_ID_CONTROLLER_EEPROM,
+                                        offset,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
             goto out;
-        }
 
-        if (desc_size != sizeof (read_message)) {
-            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: invalid data size read (%d != %d)",
-                              offset, desc_size, sizeof (read_message));
-            st = MICROTOUCH3M_STATUS_INVALID_DATA;
-            goto out;
-        }
-
-        if (read_message.size != sizeof (read_message.buffer)) {
-            microtouch3m_log ("error: couldn't get EEPROM parameter at offset 0x%hu: invalid read data size reported (%d != %d)",
-                              offset, read_message.size, sizeof (read_message.buffer));
-            st = MICROTOUCH3M_STATUS_INVALID_FORMAT;
-            goto out;
-        }
-
-        microtouch3m_log ("  read byte range: [0x%04x,0x%04x]...", offset, offset + sizeof (read_message.buffer) - 1);
-        memcpy (&buffer[offset], read_message.buffer, sizeof (read_message.buffer));
+        memcpy (&buffer[offset], parameter_report.data, PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE);
     }
 
     /* Success! */
