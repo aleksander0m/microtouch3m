@@ -24,6 +24,7 @@
  * @MICROTOUCH3M_STATUS_INVALID_IO: Invalid I/O.
  * @MICROTOUCH3M_STATUS_INVALID_DATA: Invalid data.
  * @MICROTOUCH3M_STATUS_INVALID_FORMAT: Invalid format.
+ * @MICROTOUCH3M_STATUS_INVALID_STATE: Invalid state.
  *
  * Status of an operation performed with the MicroTouch 3M library.
  */
@@ -35,6 +36,7 @@ typedef enum {
     MICROTOUCH3M_STATUS_INVALID_IO,
     MICROTOUCH3M_STATUS_INVALID_DATA,
     MICROTOUCH3M_STATUS_INVALID_FORMAT,
+    MICROTOUCH3M_STATUS_INVALID_STATE,
 } microtouch3m_status_t;
 
 /**
@@ -164,6 +166,27 @@ uint8_t microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev);
  * Returns: the USB device address.
  */
 uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
+
+/******************************************************************************/
+/* Open and close */
+
+/**
+ * microtouch3m_device_open:
+ * @dev: a #microtouch3m_device_t.
+ *
+ * Open the #microtouch_device_t.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_open (microtouch3m_device_t *dev);
+
+/**
+ * microtouch3m_device_close:
+ * @dev: a #microtouch3m_device_t.
+ *
+ * Close the #microtouch_device_t.
+ */
+void microtouch3m_device_close (microtouch3m_device_t *dev);
 
 /******************************************************************************/
 /* Device firmware operations */

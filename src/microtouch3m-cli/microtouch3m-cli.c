@@ -256,6 +256,7 @@ int main (int argc, char **argv)
     if (n_actions_require_device) {
         uint8_t busnum = 0;
         uint8_t devnum = 0;
+        microtouch3m_status_t st;
 
         if (!first && !busnum_devnum) {
             fprintf (stderr, "error: no device selection options specified\n");
@@ -283,6 +284,11 @@ int main (int argc, char **argv)
         printf ("microtouch 3m device found at %03u:%03u\n",
                 microtouch3m_device_get_usb_bus_number (dev),
                 microtouch3m_device_get_usb_device_address (dev));
+
+        if ((st = microtouch3m_device_open (dev)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't open microtouch 3m device: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
     }
 
     /* Run actions */
@@ -296,8 +302,10 @@ int main (int argc, char **argv)
         assert (0);
 
 out:
-    if (dev)
+    if (dev) {
+        microtouch3m_device_close (dev);
         microtouch3m_device_unref (dev);
+    }
     microtouch3m_context_unref (ctx);
 
     free (busnum_devnum);

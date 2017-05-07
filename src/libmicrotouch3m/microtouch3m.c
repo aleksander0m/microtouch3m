@@ -46,6 +46,7 @@ static const char *status_str[] = {
     [MICROTOUCH3M_STATUS_INVALID_IO]        = "invalid input/output",
     [MICROTOUCH3M_STATUS_INVALID_DATA]      = "invalid data",
     [MICROTOUCH3M_STATUS_INVALID_FORMAT]    = "invalid format",
+    [MICROTOUCH3M_STATUS_INVALID_STATE]     = "invalid state",
 };
 
 const char *
@@ -108,6 +109,7 @@ struct microtouch3m_device_s {
     volatile int            refcount;
     microtouch3m_context_t *ctx;
     libusb_device          *usbdev;
+    libusb_device_handle   *usbhandle;
 };
 
 static libusb_device *
@@ -229,6 +231,34 @@ microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev)
 }
 
 /******************************************************************************/
+/* Open and close */
+
+microtouch3m_status_t
+microtouch3m_device_open (microtouch3m_device_t *dev)
+{
+    assert (dev);
+
+    if (!dev->usbhandle && libusb_open (dev->usbdev, &dev->usbhandle) < 0) {
+        microtouch3m_log ("error: couldn't open usb device");
+        return MICROTOUCH3M_STATUS_FAILED;
+    }
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+void
+microtouch3m_device_close (microtouch3m_device_t *dev)
+{
+    assert (dev);
+
+    if (!dev->usbhandle)
+        return;
+
+    libusb_close (dev->usbhandle);
+    dev->usbhandle = NULL;
+}
+
+/******************************************************************************/
 /* Parameter block management */
 
 enum request_e {
@@ -253,7 +283,6 @@ struct parameter_report_s {
 
 static microtouch3m_status_t
 read_parameter_block (microtouch3m_device_t     *dev,
-                      libusb_device_handle      *handle,
                       uint16_t                   parameter_value,
                       uint16_t                   parameter_index,
                       struct parameter_report_s *parameter_report,
@@ -262,10 +291,9 @@ read_parameter_block (microtouch3m_device_t     *dev,
     int desc_size;
 
     assert (dev);
-    assert (handle);
     assert (parameter_report);
 
-    if ((desc_size = libusb_control_transfer (handle,
+    if ((desc_size = libusb_control_transfer (dev->usbhandle,
                                               LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
                                               REQUEST_GET_PARAMETER,
                                               parameter_value,
@@ -314,10 +342,8 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
                                    uint8_t               *buffer,
                                    size_t                 buffer_size)
 {
-    libusb_device_handle  *handle = NULL;
-    microtouch3m_status_t  st;
-    uint16_t               offset;
-    unsigned int           i;
+    uint16_t     offset;
+    unsigned int i;
 
     assert (dev);
     assert (buffer);
@@ -325,40 +351,33 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
     if (buffer_size < MICROTOUCH3M_FW_IMAGE_SIZE) {
         microtouch3m_log ("error: not enough space in buffer to contain the full firmware image file (%zu < %zu)",
                           buffer_size, MICROTOUCH3M_FW_IMAGE_SIZE);
-        st = MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
-        goto out;
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
     }
 
-    if (libusb_open (dev->usbdev, &handle) < 0) {
-        microtouch3m_log ("error: couldn't open usb device");
-        st = MICROTOUCH3M_STATUS_FAILED;
-        goto out;
+    if (!dev->usbhandle) {
+        microtouch3m_log ("error: device not open");
+        return MICROTOUCH3M_STATUS_INVALID_STATE;
     }
 
     microtouch3m_log ("reading firmware from controller EEPROM...");
 
     for (i = 0, offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE, i++) {
         struct parameter_report_firmware_dump_s parameter_report;
+        microtouch3m_status_t                   st;
 
         if ((st = read_parameter_block (dev,
-                                        handle,
                                         PARAMETER_ID_CONTROLLER_EEPROM,
                                         offset,
                                         (struct parameter_report_s *) &parameter_report,
                                         sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
-            goto out;
+            return st;
 
         memcpy (&buffer[offset], parameter_report.data, PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE);
     }
 
     /* Success! */
     microtouch3m_log ("successfully read firmware from controller EEPROM");
-    st = MICROTOUCH3M_STATUS_OK;
-
-out:
-    if (handle)
-        libusb_close (handle);
-    return st;
+    return MICROTOUCH3M_STATUS_OK;
 }
 
 /******************************************************************************/
