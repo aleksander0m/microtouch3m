@@ -129,6 +129,28 @@ microtouch3m_device_t *microtouch3m_device_new_by_usb_bus (microtouch3m_context_
                                                            uint8_t                 device_address);
 
 /**
+ * microtouch3m_device_new_by_usb_location:
+ * @ctx: a #microtouch3m_context_t.
+ * @port_numbers: list of ports.
+ * @port_numbers_len: number of items in @port_numbers.
+ *
+ * Creates a new #microtouch3m_device_t to manage the MicroTouch 3M device
+ * available at the USB location specified by the given @port_numbers.
+ *
+ * The list of @port_numbers is based on the physical position of the USB device
+ * and therefore if the device is reseted, when exposed again in the USB tree,
+ * it will be available at exactly the same list of @port_numbers.
+ *
+ * When no longer used, the device should be disposed with
+ * microtouch3m_device_unref().
+ *
+ * Returns: a newly allocated #microtouch3m_device_t.
+ */
+microtouch3m_device_t *microtouch3m_device_new_by_usb_location (microtouch3m_context_t *ctx,
+                                                                const uint8_t          *port_numbers,
+                                                                int                     port_numbers_len);
+
+/**
  * microtouch3m_device_ref:
  * @dev: a #microtouch3m_device_t.
  *
@@ -166,6 +188,20 @@ uint8_t microtouch3m_device_get_usb_bus_number (microtouch3m_device_t *dev);
  * Returns: the USB device address.
  */
 uint8_t microtouch3m_device_get_usb_device_address (microtouch3m_device_t *dev);
+
+/**
+ * microtouch3m_device_get_usb_location:
+ * @dev: a #microtouch3m_device_t.
+ * @port_numbers: the array that will contain the port numbers.
+ * @port_numbers_len: size of @port_numbers. As per the USB 3.0 specs, the current maximum limit for the depth is 7.
+ *
+ * Get the list of ports defining the location of this device in the USB tree.
+ *
+ * Returns: the number of elements in @port_numbers filled, or 0 on error.
+ */
+uint8_t microtouch3m_device_get_usb_location (microtouch3m_device_t *dev,
+                                              uint8_t               *port_numbers,
+                                              int                    port_numbers_len);
 
 /******************************************************************************/
 /* Open and close */

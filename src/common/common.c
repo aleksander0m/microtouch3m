@@ -169,3 +169,30 @@ strascii (const void *mem,
     /* Set output string */
     return new_str;
 }
+
+char *
+str_usb_location (uint8_t        bus,
+                  const uint8_t *port_numbers,
+                  int            port_numbers_len)
+{
+    char   *new_str;
+    size_t  i, j, new_str_length, written;
+
+    /* Allocate worst case */
+    new_str_length = 4 + (port_numbers_len * 4) + 1;
+
+    new_str = calloc (new_str_length, 1);
+    if (!new_str)
+        return NULL;
+
+    written = snprintf (new_str, 5, "%u-", bus);
+    for (i = 0, j = written; i < port_numbers_len; i++) {
+        written = snprintf (&new_str[j], 4, "%u", port_numbers[i]);
+        if (i != (port_numbers_len - 1))
+            new_str[j + written++] = '.';
+        j += written;
+    }
+
+    return new_str;
+
+}

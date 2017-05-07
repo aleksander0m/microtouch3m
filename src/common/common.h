@@ -28,4 +28,8 @@ ssize_t strbin (const char *str,
 char *strascii (const void *mem,
                 size_t      size);
 
+char *str_usb_location (uint8_t        bus,
+                        const uint8_t *port_numbers,
+                        int            port_numbers_len);
+
 #endif /* COMMON_H */
