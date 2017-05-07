@@ -238,6 +238,18 @@ typedef struct microtouch3m_device_data_s microtouch3m_device_data_t;
 microtouch3m_status_t microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
                                                        microtouch3m_device_data_t **out_data);
 
+/**
+ * microtouch3m_device_restore_data:
+ * @dev: a #microtouch3m_device_t.
+ * @data: a #microtouch3m_device_data_t.
+ *
+ * Restores the device data.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
+                                                        const microtouch3m_device_data_t *data);
+
 /******************************************************************************/
 /* Firmware files */
 

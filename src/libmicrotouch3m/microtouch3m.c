@@ -280,8 +280,9 @@ microtouch3m_device_close (microtouch3m_device_t *dev)
 
 enum request_e {
     REQUEST_GET_PARAMETER_BLOCK = 0x02,
-    REQUEST_SET_PARAMETER       = 0x03,
+    REQUEST_SET_PARAMETER_BLOCK = 0x03,
     REQUEST_GET_PARAMETER       = 0x10,
+    REQUEST_SET_PARAMETER       = 0x11,
 };
 
 enum parameter_id_e {
@@ -345,6 +346,42 @@ run_in_request (microtouch3m_device_t     *dev,
 
     microtouch3m_log ("successfully run IN request 0x%02x value 0x%04x index 0x%04x",
                       parameter_cmd, parameter_value, parameter_index);
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+static microtouch3m_status_t
+run_out_request (microtouch3m_device_t *dev,
+                 enum request_e         parameter_cmd,
+                 uint16_t               parameter_value,
+                 uint16_t               parameter_index,
+                 const uint8_t         *parameter_data,
+                 size_t                 parameter_data_size)
+{
+    int desc_size;
+
+    assert (dev);
+
+    if ((desc_size = libusb_control_transfer (dev->usbhandle,
+                                              LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+                                              parameter_cmd,
+                                              parameter_value,
+                                              parameter_index,
+                                              (uint8_t *) parameter_data,
+                                              parameter_data_size,
+                                              5000)) < 0) {
+        microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes",
+                          parameter_cmd, parameter_value, parameter_index, parameter_data_size);
+        return MICROTOUCH3M_STATUS_INVALID_IO;
+    }
+
+    if (desc_size != parameter_data_size) {
+        microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x: invalid data size written (%d != %d)",
+                          parameter_cmd, parameter_value, parameter_index, desc_size, parameter_data_size);
+        return MICROTOUCH3M_STATUS_INVALID_DATA;
+    }
+
+    microtouch3m_log ("successfully run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes",
+                      parameter_cmd, parameter_value, parameter_index, parameter_data_size);
     return MICROTOUCH3M_STATUS_OK;
 }
 
@@ -528,6 +565,56 @@ out:
     else
         *out_data = data;
     return st;
+}
+
+microtouch3m_status_t
+microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
+                                  const microtouch3m_device_data_t *data)
+{
+    microtouch3m_status_t st;
+
+    assert (dev);
+    assert (data);
+
+    microtouch3m_log ("restoring calibration data...");
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_NOVRAM,
+                               (CALIBRATION_DATA_BLOCK << 8),
+                               data->calibration_data,
+                               CALIBRATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log ("restoring linearization data...");
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_NOVRAM,
+                               (LINEARIZATION_DATA_BLOCK << 8),
+                               data->linearization_data,
+                               LINEARIZATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log ("restoring orientation data...");
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER,
+                               ORIENTATION_PARAMETER_NUMBER,
+                               0x0000,
+                               data->orientation_data,
+                               ORIENTATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log ("restoring identifier data...");
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER,
+                               IDENTIFIER_PARAMETER_NUMBER,
+                               0x0000,
+                               data->identifier_data,
+                               IDENTIFIER_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    /* Success! */
+    microtouch3m_log ("successfully restored controller data");
+    return MICROTOUCH3M_STATUS_OK;
 }
 
 /******************************************************************************/
