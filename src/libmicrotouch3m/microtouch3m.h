@@ -212,6 +212,32 @@ microtouch3m_status_t microtouch3m_device_firmware_dump (microtouch3m_device_t *
                                                          uint8_t               *buffer,
                                                          size_t                 buffer_size);
 
+/**
+ * microtouch3m_device_data_t:
+ *
+ * Opaque type representing the data that should be backed up before a firmware
+ * update and restored after the update has finished.
+ *
+ * This data includes calibration, linearization, orientation and identifier
+ * data.
+ */
+typedef struct microtouch3m_device_data_s microtouch3m_device_data_t;
+
+/**
+ * microtouch3m_device_backup_data:
+ * @dev: a #microtouch3m_device_t.
+ * @out_data: output location to store a newly allocated #microtouch3m_device_data_t.
+ *
+ * Backs up the device data.
+ *
+ * The @out_data will only be set if #MICROTOUCH3M_STATUS_OK is returned, and
+ * should be disposed with free() when no longer used.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
+                                                       microtouch3m_device_data_t **out_data);
+
 /******************************************************************************/
 /* Firmware files */
 

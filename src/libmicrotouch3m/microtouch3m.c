@@ -25,6 +25,9 @@
 
 #include "ihex.h"
 
+/* Define this symbol to enable verbose traces */
+/* #define ENABLE_TRACES */
+
 #if !defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
 # error GCC built-in atomic method support is required
 #endif
@@ -34,6 +37,20 @@
 
 #define MICROTOUCH3M_VID 0x0596
 #define MICROTOUCH3M_PID 0x0001
+
+#if defined ENABLE_TRACES
+static void
+trace_buffer (const char *name, const uint8_t *buffer, size_t buffer_size)
+{
+    char *hex;
+
+    hex = strhex (buffer, buffer_size, ":");
+    microtouch3m_log ("%s (%d bytes): %s", name, buffer_size, hex);
+    free (hex);
+}
+#else
+#define trace_buffer(...)
+#endif
 
 /******************************************************************************/
 /* Status */
@@ -264,6 +281,7 @@ microtouch3m_device_close (microtouch3m_device_t *dev)
 enum request_e {
     REQUEST_GET_PARAMETER_BLOCK = 0x02,
     REQUEST_SET_PARAMETER       = 0x03,
+    REQUEST_GET_PARAMETER       = 0x10,
 };
 
 enum parameter_id_e {
@@ -382,6 +400,134 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
     /* Success! */
     microtouch3m_log ("successfully read firmware from controller EEPROM");
     return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Firmware update */
+
+#define CALIBRATION_DATA_BLOCK  1
+#define CALIBRATION_DATA_SIZE  30
+struct parameter_report_calibration_data_s {
+    struct parameter_report_s header;
+    uint8_t                   data [CALIBRATION_DATA_SIZE];
+} __attribute__((packed));
+
+#define LINEARIZATION_DATA_BLOCK  2
+#define LINEARIZATION_DATA_SIZE  50
+struct parameter_report_linearization_data_s {
+    struct parameter_report_s header;
+    uint8_t                   data [LINEARIZATION_DATA_SIZE];
+} __attribute__((packed));
+
+#define ORIENTATION_PARAMETER_NUMBER 1
+#define ORIENTATION_DATA_SIZE        2
+struct parameter_report_orientation_data_s {
+    struct parameter_report_s header;
+    uint8_t                   data [ORIENTATION_DATA_SIZE];
+} __attribute__((packed));
+
+#define IDENTIFIER_PARAMETER_NUMBER 2
+#define IDENTIFIER_DATA_SIZE        4
+struct parameter_report_identifier_data_s {
+    struct parameter_report_s header;
+    uint8_t                   data [IDENTIFIER_DATA_SIZE];
+} __attribute__((packed));
+
+struct microtouch3m_device_data_s {
+    uint8_t calibration_data   [CALIBRATION_DATA_SIZE];
+    uint8_t linearization_data [LINEARIZATION_DATA_SIZE];
+    uint8_t orientation_data   [ORIENTATION_DATA_SIZE];
+    uint8_t identifier_data    [IDENTIFIER_DATA_SIZE];
+};
+
+microtouch3m_status_t
+microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
+                                 microtouch3m_device_data_t **out_data)
+{
+    microtouch3m_status_t       st;
+    microtouch3m_device_data_t *data;
+
+    assert (dev);
+    assert (out_data);
+
+    data = calloc (1, sizeof (struct microtouch3m_device_data_s));
+    if (!data)
+        return MICROTOUCH3M_STATUS_NO_MEMORY;
+
+    microtouch3m_log ("backing up calibration data...");
+    {
+        struct parameter_report_calibration_data_s parameter_report;
+
+        if ((st = run_in_request (dev,
+                                  REQUEST_GET_PARAMETER_BLOCK,
+                                  PARAMETER_ID_CONTROLLER_NOVRAM,
+                                  (CALIBRATION_DATA_BLOCK << 8),
+                                  (struct parameter_report_s *) &parameter_report,
+                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+            goto out;
+
+        memcpy (data->calibration_data, parameter_report.data, CALIBRATION_DATA_SIZE);
+        trace_buffer ("calibration data backed up", data->calibration_data, CALIBRATION_DATA_SIZE);
+    }
+
+    microtouch3m_log ("backing up linearization data...");
+    {
+        struct parameter_report_linearization_data_s parameter_report;
+
+        if ((st = run_in_request (dev,
+                                  REQUEST_GET_PARAMETER_BLOCK,
+                                  PARAMETER_ID_CONTROLLER_NOVRAM,
+                                  (LINEARIZATION_DATA_BLOCK << 8),
+                                  (struct parameter_report_s *) &parameter_report,
+                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+            goto out;
+
+        memcpy (data->linearization_data, parameter_report.data, LINEARIZATION_DATA_SIZE);
+        trace_buffer ("linearization data backed up", data->linearization_data, LINEARIZATION_DATA_SIZE);
+    }
+
+    microtouch3m_log ("backing up orientation data...");
+    {
+        struct parameter_report_orientation_data_s parameter_report;
+
+        if ((st = run_in_request (dev,
+                                  REQUEST_GET_PARAMETER,
+                                  ORIENTATION_PARAMETER_NUMBER,
+                                  0x0000,
+                                  (struct parameter_report_s *) &parameter_report,
+                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+            goto out;
+
+        memcpy (data->orientation_data, parameter_report.data, ORIENTATION_DATA_SIZE);
+        trace_buffer ("orientation data backed up", data->orientation_data, ORIENTATION_DATA_SIZE);
+    }
+
+    microtouch3m_log ("backing up identifier data...");
+    {
+        struct parameter_report_identifier_data_s parameter_report;
+
+        if ((st = run_in_request (dev,
+                                  REQUEST_GET_PARAMETER,
+                                  IDENTIFIER_PARAMETER_NUMBER,
+                                  0x0000,
+                                  (struct parameter_report_s *) &parameter_report,
+                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+            goto out;
+
+        memcpy (data->identifier_data, parameter_report.data, IDENTIFIER_DATA_SIZE);
+        trace_buffer ("identifier data backed up", data->identifier_data, IDENTIFIER_DATA_SIZE);
+    }
+
+    /* Success! */
+    microtouch3m_log ("successfully backed up controller data");
+    st = MICROTOUCH3M_STATUS_OK;
+
+out:
+    if (st != MICROTOUCH3M_STATUS_OK)
+        free (data);
+    else
+        *out_data = data;
+    return st;
 }
 
 /******************************************************************************/
