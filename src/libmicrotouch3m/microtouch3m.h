@@ -189,6 +189,45 @@ microtouch3m_status_t microtouch3m_device_open (microtouch3m_device_t *dev);
 void microtouch3m_device_close (microtouch3m_device_t *dev);
 
 /******************************************************************************/
+/* Reset */
+
+/**
+ * microtouch3m_device_reset_t:
+ * @MICROTOUCH3M_DEVICE_RESET_SOFT: Soft reset.
+ * @MICROTOUCH3M_DEVICE_RESET_HARD: Hard reset.
+ * @MICROTOUCH3M_DEVICE_RESET_REBOOT: Reboot after a firmware update operation.
+ *
+ * Type of reset operation.
+ */
+typedef enum {
+    MICROTOUCH3M_DEVICE_RESET_SOFT   = 0x0001,
+    MICROTOUCH3M_DEVICE_RESET_HARD   = 0x0002,
+    MICROTOUCH3M_DEVICE_RESET_REBOOT = 0x0005,
+} microtouch3m_device_reset_t;
+
+/**
+ * microtouch3m_device_reset_to_string:
+ * @reset: a #microtouch3m_device_reset_t.
+ *
+ * Gets a description for the given #microtouch3m_device_reset_t.
+ *
+ * Returns: a constant string.
+ */
+const char *microtouch3m_device_reset_to_string (microtouch3m_device_reset_t reset);
+
+/**
+ * microtouch3m_device_reset:
+ * @dev: a #microtouch3m_device_t.
+ * @reset: type of reset.
+ *
+ * Reset the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *dev,
+                                                 microtouch3m_device_reset_t  reset);
+
+/******************************************************************************/
 /* Device firmware operations */
 
 /**

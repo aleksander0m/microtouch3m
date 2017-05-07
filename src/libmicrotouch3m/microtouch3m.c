@@ -276,11 +276,12 @@ microtouch3m_device_close (microtouch3m_device_t *dev)
 }
 
 /******************************************************************************/
-/* Parameter block management */
+/* IN/OUT requests */
 
 enum request_e {
     REQUEST_GET_PARAMETER_BLOCK = 0x02,
     REQUEST_SET_PARAMETER_BLOCK = 0x03,
+    REQUEST_RESET               = 0x07,
     REQUEST_GET_PARAMETER       = 0x10,
     REQUEST_SET_PARAMETER       = 0x11,
 };
@@ -382,6 +383,40 @@ run_out_request (microtouch3m_device_t *dev,
 
     microtouch3m_log ("successfully run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes",
                       parameter_cmd, parameter_value, parameter_index, parameter_data_size);
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Reset */
+
+static const char *reset_str[] = {
+    [MICROTOUCH3M_DEVICE_RESET_SOFT]   = "soft",
+    [MICROTOUCH3M_DEVICE_RESET_HARD]   = "hard",
+    [MICROTOUCH3M_DEVICE_RESET_REBOOT] = "reboot",
+};
+
+const char *
+microtouch3m_device_reset_to_string (microtouch3m_device_reset_t reset)
+{
+    return (((reset < (sizeof (reset_str) / sizeof (reset_str[0]))) && (reset_str[reset])) ? reset_str[reset] : "unknown");
+}
+
+microtouch3m_status_t
+microtouch3m_device_reset (microtouch3m_device_t       *dev,
+                           microtouch3m_device_reset_t  reset)
+{
+    microtouch3m_status_t st;
+
+    microtouch3m_log ("requesting controller reset: %s", microtouch3m_device_reset_to_string (reset));
+    if ((st = run_out_request (dev,
+                               REQUEST_RESET,
+                               reset,
+                               0x0000,
+                               NULL, 0)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    /* Success! */
+    microtouch3m_log ("successfully requested controller reset");
     return MICROTOUCH3M_STATUS_OK;
 }
 
