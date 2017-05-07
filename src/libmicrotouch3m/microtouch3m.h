@@ -101,32 +101,32 @@ void microtouch3m_context_unref (microtouch3m_context_t *ctx);
 typedef struct microtouch3m_device_s microtouch3m_device_t;
 
 /**
- * microtouch3m_device_new:
+ * microtouch3m_device_new_by_usb_bus:
  * @ctx: a #microtouch3m_context_t.
- * @busnum: bus number, or 0.
- * @devnum: device number, or 0.
+ * @bus_number: bus number, or 0.
+ * @device_address: device address in the bus, or 0.
  *
  * Creates a new #microtouch3m_device_t to manage the MicroTouch 3M device
- * available at device address @devnum in bus @busnum.
+ * available at device address @device_address in bus @bus_number.
  *
- * @busnum may be 0 if no explicit bus number is requested. If so, all available
+ * @bus_number may be 0 if no explicit bus number is requested. If so, all available
  * buses will be scanned looking for MicroTouch 3M devices.
  *
- * @devnum may be 0 if no explicit device address is requested. If so, the first
- * MicroTouch 3M device found will be considered (if @busnum is given, only the
+ * @device_address may be 0 if no explicit device address is requested. If so, the first
+ * MicroTouch 3M device found will be considered (if @bus_number is given, only the
  * specific bus will be scanned).
  *
  * If more than one MicroTouch 3M device is available in the system, both
- * @busnum and @devnum should be given for a correct operation.
+ * @bus_number and @device_address should be given for a correct operation.
  *
  * When no longer used, the device should be disposed with
  * microtouch3m_device_unref().
  *
  * Returns: a newly allocated #microtouch3m_device_t.
  */
-microtouch3m_device_t *microtouch3m_device_new (microtouch3m_context_t *ctx,
-                                                uint8_t                 busnum,
-                                                uint8_t                 devnum);
+microtouch3m_device_t *microtouch3m_device_new_by_usb_bus (microtouch3m_context_t *ctx,
+                                                           uint8_t                 bus_number,
+                                                           uint8_t                 device_address);
 
 /**
  * microtouch3m_device_ref:
