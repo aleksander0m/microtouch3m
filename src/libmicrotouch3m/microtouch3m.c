@@ -570,7 +570,7 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
 }
 
 /******************************************************************************/
-/* Firmware update */
+/* Device data backup/restore */
 
 #define CALIBRATION_DATA_BLOCK  1
 #define CALIBRATION_DATA_SIZE  30
@@ -744,6 +744,52 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
 
     /* Success! */
     microtouch3m_log ("successfully restored controller data");
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Firmware update */
+
+#define FIRMWARE_UPDATE_DATA_SIZE 64
+
+microtouch3m_status_t
+microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
+                                     const uint8_t         *buffer,
+                                     size_t                 buffer_size)
+{
+    uint16_t     offset;
+    unsigned int i;
+
+    assert (dev);
+    assert (buffer);
+
+    if (buffer_size < MICROTOUCH3M_FW_IMAGE_SIZE) {
+        microtouch3m_log ("error: not enough space in buffer to contain the full firmware image file (%zu < %zu)",
+                          buffer_size, MICROTOUCH3M_FW_IMAGE_SIZE);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+
+    if (!dev->usbhandle) {
+        microtouch3m_log ("error: device not open");
+        return MICROTOUCH3M_STATUS_INVALID_STATE;
+    }
+
+    microtouch3m_log ("updating firmware in controller EEPROM...");
+
+    for (i = 0, offset = 0; offset < MICROTOUCH3M_FW_IMAGE_SIZE; offset += FIRMWARE_UPDATE_DATA_SIZE, i++) {
+        microtouch3m_status_t st;
+
+        if ((st = run_out_request (dev,
+                                   REQUEST_SET_PARAMETER_BLOCK,
+                                   PARAMETER_ID_CONTROLLER_EEPROM,
+                                   offset,
+                                   &buffer[offset],
+                                   FIRMWARE_UPDATE_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+            return st;
+    }
+
+    /* Success! */
+    microtouch3m_log ("successfully written firmware to controller EEPROM");
     return MICROTOUCH3M_STATUS_OK;
 }
 

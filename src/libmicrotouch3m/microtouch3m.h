@@ -288,6 +288,20 @@ microtouch3m_status_t microtouch3m_device_firmware_dump (microtouch3m_device_t *
                                                          size_t                 buffer_size);
 
 /**
+ * microtouch3m_device_firmware_update:
+ * @dev: a #microtouch3m_device_t.
+ * @buffer: buffer where the firmware contents are stored.
+ * @buffer_size: size of @buffer (at least #MICROTOUCH3M_FW_IMAGE_SIZE bytes).
+ *
+ * Instruct the device to update the firmware.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
+                                                           const uint8_t         *buffer,
+                                                           size_t                 buffer_size);
+
+/**
  * microtouch3m_device_data_t:
  *
  * Opaque type representing the data that should be backed up before a firmware
