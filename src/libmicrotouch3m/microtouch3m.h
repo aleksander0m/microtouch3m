@@ -101,7 +101,7 @@ void microtouch3m_context_unref (microtouch3m_context_t *ctx);
 typedef struct microtouch3m_device_s microtouch3m_device_t;
 
 /**
- * microtouch3m_device_new_by_usb_bus:
+ * microtouch3m_device_new_by_usb_address:
  * @ctx: a #microtouch3m_context_t.
  * @bus_number: bus number, or 0.
  * @device_address: device address in the bus, or 0.
@@ -124,9 +124,9 @@ typedef struct microtouch3m_device_s microtouch3m_device_t;
  *
  * Returns: a newly allocated #microtouch3m_device_t.
  */
-microtouch3m_device_t *microtouch3m_device_new_by_usb_bus (microtouch3m_context_t *ctx,
-                                                           uint8_t                 bus_number,
-                                                           uint8_t                 device_address);
+microtouch3m_device_t *microtouch3m_device_new_by_usb_address (microtouch3m_context_t *ctx,
+                                                               uint8_t                 bus_number,
+                                                               uint8_t                 device_address);
 
 /**
  * microtouch3m_device_new_by_usb_location:

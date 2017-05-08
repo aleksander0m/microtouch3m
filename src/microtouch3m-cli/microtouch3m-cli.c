@@ -40,7 +40,7 @@ create_device_by_usb_bus (microtouch3m_context_t *ctx,
     uint8_t                port_numbers[MAX_PORT_NUMBERS];
     int                    port_numbers_len;
 
-    dev = microtouch3m_device_new_by_usb_bus (ctx, bus_number, device_address);
+    dev = microtouch3m_device_new_by_usb_address (ctx, bus_number, device_address);
     if (!dev) {
         if (bus_number && device_address)
             fprintf (stderr, "error: couldn't find a microtouch 3m device at %03u:%03u\n", bus_number, device_address);

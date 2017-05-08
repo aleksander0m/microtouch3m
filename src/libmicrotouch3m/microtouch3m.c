@@ -153,9 +153,9 @@ outerr:
 }
 
 static libusb_device *
-find_usb_device_by_bus (microtouch3m_context_t *ctx,
-                        uint8_t                 bus_number,
-                        uint8_t                 device_address)
+find_usb_device_by_address (microtouch3m_context_t *ctx,
+                            uint8_t                 bus_number,
+                            uint8_t                 device_address)
 {
     libusb_device **list = NULL;
     libusb_device  *found = NULL;
@@ -206,13 +206,13 @@ find_usb_device_by_bus (microtouch3m_context_t *ctx,
 }
 
 microtouch3m_device_t *
-microtouch3m_device_new_by_usb_bus (microtouch3m_context_t *ctx,
-                                    uint8_t                 bus_number,
-                                    uint8_t                 device_address)
+microtouch3m_device_new_by_usb_address (microtouch3m_context_t *ctx,
+                                        uint8_t                 bus_number,
+                                        uint8_t                 device_address)
 {
     libusb_device *usbdev;
 
-    usbdev = find_usb_device_by_bus (ctx, bus_number, device_address);
+    usbdev = find_usb_device_by_address (ctx, bus_number, device_address);
     if (!usbdev)
         return NULL;
 
