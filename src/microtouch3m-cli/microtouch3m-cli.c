@@ -83,7 +83,7 @@ create_device_by_usb_location (microtouch3m_context_t *ctx,
     microtouch3m_status_t  st;
     char                  *location_str;
 
-    dev = microtouch3m_device_new_by_usb_location (ctx, port_numbers, port_numbers_len);
+    dev = microtouch3m_device_new_by_usb_location (ctx, bus_number, port_numbers, port_numbers_len);
     if (!dev)
         return NULL;
 

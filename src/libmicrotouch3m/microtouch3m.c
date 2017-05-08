@@ -224,6 +224,7 @@ microtouch3m_device_new_by_usb_bus (microtouch3m_context_t *ctx,
 
 static libusb_device *
 find_usb_device_by_location (microtouch3m_context_t *ctx,
+                             uint8_t                 bus_number,
                              const uint8_t          *port_numbers,
                              int                     port_numbers_len)
 {
@@ -241,11 +242,16 @@ find_usb_device_by_location (microtouch3m_context_t *ctx,
     for (i = 0; !found && list[i]; i++) {
         libusb_device                   *iter;
         struct libusb_device_descriptor  desc;
+        uint8_t                          iter_bus_number;
         uint8_t                          iter_port_numbers[MAX_PORT_NUMBERS];
         int                              iter_port_numbers_len;
         char                            *location_str;
 
         iter = list[i];
+
+        iter_bus_number = libusb_get_bus_number (iter);
+        if (bus_number != iter_bus_number)
+            continue;
 
         iter_port_numbers_len = libusb_get_port_numbers (iter, (uint8_t *) iter_port_numbers, MAX_PORT_NUMBERS);
 
@@ -283,12 +289,13 @@ find_usb_device_by_location (microtouch3m_context_t *ctx,
 
 microtouch3m_device_t *
 microtouch3m_device_new_by_usb_location (microtouch3m_context_t *ctx,
+                                         uint8_t                 bus_number,
                                          const uint8_t          *port_numbers,
                                          int                     port_numbers_len)
 {
     libusb_device *usbdev;
 
-    usbdev = find_usb_device_by_location (ctx, port_numbers, port_numbers_len);
+    usbdev = find_usb_device_by_location (ctx, bus_number, port_numbers, port_numbers_len);
     if (!usbdev)
         return NULL;
 

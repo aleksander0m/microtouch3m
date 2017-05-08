@@ -131,15 +131,17 @@ microtouch3m_device_t *microtouch3m_device_new_by_usb_bus (microtouch3m_context_
 /**
  * microtouch3m_device_new_by_usb_location:
  * @ctx: a #microtouch3m_context_t.
+ * @bus_number: bus number.
  * @port_numbers: list of ports.
  * @port_numbers_len: number of items in @port_numbers.
  *
  * Creates a new #microtouch3m_device_t to manage the MicroTouch 3M device
- * available at the USB location specified by the given @port_numbers.
+ * available at the USB location specified by the given @bus_number and
+ * @port_numbers.
  *
  * The list of @port_numbers is based on the physical position of the USB device
  * and therefore if the device is reseted, when exposed again in the USB tree,
- * it will be available at exactly the same list of @port_numbers.
+ * it will be available at exactly the same @bus_number and  @port_numbers.
  *
  * When no longer used, the device should be disposed with
  * microtouch3m_device_unref().
@@ -147,6 +149,7 @@ microtouch3m_device_t *microtouch3m_device_new_by_usb_bus (microtouch3m_context_
  * Returns: a newly allocated #microtouch3m_device_t.
  */
 microtouch3m_device_t *microtouch3m_device_new_by_usb_location (microtouch3m_context_t *ctx,
+                                                                uint8_t                 bus_number,
                                                                 const uint8_t          *port_numbers,
                                                                 int                     port_numbers_len);
 
