@@ -78,6 +78,25 @@ create_device (microtouch3m_context_t *ctx,
 }
 
 /******************************************************************************/
+/* Helper: firmware progress reporting */
+
+#define CLEAR_LINE "\33[2K\r"
+
+static bool disable_progress;
+
+static void
+firmware_progress (microtouch3m_device_t *dev,
+                   float                  progress,
+                   void                  *user_data)
+{
+    if (disable_progress)
+        return;
+
+    printf (CLEAR_LINE " %.2f%%", progress);
+    fflush (stdout);
+}
+
+/******************************************************************************/
 /* ACTION: validate file */
 
 static int
@@ -130,10 +149,12 @@ run_firmware_dump (microtouch3m_context_t *ctx,
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
+    microtouch3m_device_firmware_progress_register (dev, firmware_progress, 1.0, NULL);
     if ((st = microtouch3m_device_firmware_dump (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't dump device firmware: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
+    printf ("\n");
 
     if ((st = microtouch3m_firmware_file_write (path, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't write firmware to file: %s\n", microtouch3m_status_to_string (st));
@@ -191,10 +212,12 @@ run_firmware_update (microtouch3m_context_t *ctx,
     }
 
     printf ("downloading firmware to device EEPROM...\n");
+    microtouch3m_device_firmware_progress_register (dev, firmware_progress, 1.0, NULL);
     if ((st = microtouch3m_device_firmware_update (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't download firmware to device EEPROM: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
+    printf ("\n");
 
     /* The device will change address once rebooted, so we'll monitor that as
      * well to make sure we don't try to use the device before it's rebooted. */
@@ -426,6 +449,7 @@ int main (int argc, char **argv)
     if (debug) {
         main_tid = pthread_self ();
         microtouch3m_log_set_handler (log_handler);
+        disable_progress = true;
     }
 
     /* Initialize library */
