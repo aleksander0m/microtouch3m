@@ -22,6 +22,10 @@ void microtouch3m_log_raw_full (pthread_t   thread_id,
                                 const void *mem,
                                 size_t      size);
 
+void microtouch3m_log_buffer   (const char    *name,
+                                const uint8_t *buffer,
+                                size_t         buffer_size);
+
 #define microtouch3m_log(...) microtouch3m_log_full (pthread_self (), ## __VA_ARGS__ )
 #define microtouch3m_log_raw(prefix, mem,size) microtouch3m_log_raw_full (pthread_self (), prefix, mem, size)
 

@@ -25,9 +25,6 @@
 
 #include "ihex.h"
 
-/* Define this symbol to enable verbose traces */
-/* #define ENABLE_TRACES */
-
 #if !defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
 # error GCC built-in atomic method support is required
 #endif
@@ -37,20 +34,6 @@
 
 #define MICROTOUCH3M_VID 0x0596
 #define MICROTOUCH3M_PID 0x0001
-
-#if defined ENABLE_TRACES
-static void
-trace_buffer (const char *name, const uint8_t *buffer, size_t buffer_size)
-{
-    char *hex;
-
-    hex = strhex (buffer, buffer_size, ":");
-    microtouch3m_log ("%s (%d bytes): %s", name, buffer_size, hex);
-    free (hex);
-}
-#else
-#define trace_buffer(...)
-#endif
 
 /******************************************************************************/
 /* Status */
@@ -641,7 +624,7 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
             goto out;
 
         memcpy (data->calibration_data, parameter_report.data, CALIBRATION_DATA_SIZE);
-        trace_buffer ("calibration data backed up", data->calibration_data, CALIBRATION_DATA_SIZE);
+        microtouch3m_log_buffer ("calibration data backed up", data->calibration_data, CALIBRATION_DATA_SIZE);
     }
 
     microtouch3m_log ("backing up linearization data...");
@@ -658,7 +641,7 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
             goto out;
 
         memcpy (data->linearization_data, parameter_report.data, LINEARIZATION_DATA_SIZE);
-        trace_buffer ("linearization data backed up", data->linearization_data, LINEARIZATION_DATA_SIZE);
+        microtouch3m_log_buffer ("linearization data backed up", data->linearization_data, LINEARIZATION_DATA_SIZE);
     }
 
     microtouch3m_log ("backing up orientation data...");
@@ -675,7 +658,7 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
             goto out;
 
         memcpy (data->orientation_data, parameter_report.data, ORIENTATION_DATA_SIZE);
-        trace_buffer ("orientation data backed up", data->orientation_data, ORIENTATION_DATA_SIZE);
+        microtouch3m_log_buffer ("orientation data backed up", data->orientation_data, ORIENTATION_DATA_SIZE);
     }
 
     microtouch3m_log ("backing up identifier data...");
@@ -692,7 +675,7 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
             goto out;
 
         memcpy (data->identifier_data, parameter_report.data, IDENTIFIER_DATA_SIZE);
-        trace_buffer ("identifier data backed up", data->identifier_data, IDENTIFIER_DATA_SIZE);
+        microtouch3m_log_buffer ("identifier data backed up", data->identifier_data, IDENTIFIER_DATA_SIZE);
     }
 
     /* Success! */
