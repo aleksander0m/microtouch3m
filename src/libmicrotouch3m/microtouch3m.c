@@ -869,7 +869,7 @@ microtouch3m_firmware_file_write (const char    *path,
                                   size_t         buffer_size)
 {
     microtouch3m_status_t  status = MICROTOUCH3M_STATUS_FAILED;
-    FILE                  *f;
+    FILE                  *f = NULL;
     uint16_t               offset;
     IHexRecord             record;
     int                    ihex_ret;
@@ -930,7 +930,7 @@ microtouch3m_firmware_file_read (const char *path,
                                  size_t      buffer_size)
 {
     microtouch3m_status_t  status = MICROTOUCH3M_STATUS_FAILED;
-    FILE                  *f;
+    FILE                  *f = NULL;
     bool                   exii_first_found = false;
     bool                   exii_last_found = false;
     unsigned int           n_data_records = 0;
