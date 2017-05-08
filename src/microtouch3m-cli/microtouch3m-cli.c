@@ -30,73 +30,42 @@
 #define MAX_PORT_NUMBERS 7
 
 static microtouch3m_device_t *
-create_device_by_usb_bus (microtouch3m_context_t *ctx,
-                          uint8_t                 bus_number,
-                          uint8_t                 device_address)
+create_device (microtouch3m_context_t *ctx,
+               bool                    first,
+               uint8_t                 bus_number,
+               uint8_t                 device_address,
+               const uint8_t          *port_numbers,
+               int                     port_numbers_len)
 {
     microtouch3m_device_t *dev;
     microtouch3m_status_t  st;
     char                  *location_str;
-    uint8_t                port_numbers[MAX_PORT_NUMBERS];
-    int                    port_numbers_len;
+    uint8_t                real_port_numbers[MAX_PORT_NUMBERS];
+    int                    real_port_numbers_len;
 
-    dev = microtouch3m_device_new_by_usb_address (ctx, bus_number, device_address);
+    if (first)
+        dev = microtouch3m_device_new_first (ctx);
+    else if (bus_number && device_address)
+        dev = microtouch3m_device_new_by_usb_address (ctx, bus_number, device_address);
+    else if (bus_number && port_numbers && port_numbers_len)
+        dev = microtouch3m_device_new_by_usb_location (ctx, bus_number, port_numbers, port_numbers_len);
+    else
+        assert (0);
+
     if (!dev) {
-        if (bus_number && device_address)
-            fprintf (stderr, "error: couldn't find a microtouch 3m device at %03u:%03u\n", bus_number, device_address);
-        else if (device_address)
-            fprintf (stderr, "error: couldn't find a microtouch 3m device at address %03u in any USB bus\n", device_address);
-        else
-            fprintf (stderr, "error: couldn't find any microtouch 3m device\n");
+        fprintf (stderr, "error: couldn't find microtouch 3m device\n");
         return NULL;
     }
 
-    port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
-    location_str = str_usb_location (microtouch3m_device_get_usb_bus_number (dev), port_numbers, port_numbers_len);
-
+    real_port_numbers_len = microtouch3m_device_get_usb_location (dev, real_port_numbers, MAX_PORT_NUMBERS);
+    location_str = str_usb_location (microtouch3m_device_get_usb_bus_number (dev), real_port_numbers, real_port_numbers_len);
     printf ("microtouch 3m device found at:\n"
             "\tbus number:     %u\n"
             "\tdevice address: %u\n"
-            "\tusb location:   %s\n",
+            "\tlocation:       %s\n",
             microtouch3m_device_get_usb_bus_number (dev),
             microtouch3m_device_get_usb_device_address (dev),
             location_str);
-
-    free (location_str);
-
-    if ((st = microtouch3m_device_open (dev)) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't open microtouch 3m device: %s\n", microtouch3m_status_to_string (st));
-        microtouch3m_device_unref (dev);
-        return NULL;
-    }
-
-    return dev;
-}
-
-static microtouch3m_device_t *
-create_device_by_usb_location (microtouch3m_context_t *ctx,
-                               uint8_t                 bus_number,
-                               const uint8_t          *port_numbers,
-                               int                     port_numbers_len)
-{
-    microtouch3m_device_t *dev;
-    microtouch3m_status_t  st;
-    char                  *location_str;
-
-    dev = microtouch3m_device_new_by_usb_location (ctx, bus_number, port_numbers, port_numbers_len);
-    if (!dev)
-        return NULL;
-
-    location_str = str_usb_location (microtouch3m_device_get_usb_bus_number (dev), port_numbers, port_numbers_len);
-
-    printf ("microtouch 3m device found at:\n"
-            "\tbus number:     %u\n"
-            "\tdevice address: %u\n"
-            "\tusb location:   %s\n",
-            microtouch3m_device_get_usb_bus_number (dev),
-            microtouch3m_device_get_usb_device_address (dev),
-            location_str);
-
     free (location_str);
 
     if ((st = microtouch3m_device_open (dev)) != MICROTOUCH3M_STATUS_OK) {
@@ -130,12 +99,13 @@ run_validate_fw_file (const char *path)
 
 static int
 run_info (microtouch3m_context_t *ctx,
+          bool                    first,
           uint8_t                 bus_number,
           uint8_t                 device_address)
 {
     microtouch3m_device_t *dev;
 
-    if (!(dev = create_device_by_usb_bus (ctx, bus_number, device_address)))
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         return EXIT_FAILURE;
 
     microtouch3m_device_close (dev);
@@ -148,6 +118,7 @@ run_info (microtouch3m_context_t *ctx,
 
 static int
 run_firmware_dump (microtouch3m_context_t *ctx,
+                   bool                    first,
                    uint8_t                 bus_number,
                    uint8_t                 device_address,
                    const char             *path)
@@ -157,7 +128,7 @@ run_firmware_dump (microtouch3m_context_t *ctx,
     microtouch3m_device_t *dev;
     int                    ret = EXIT_FAILURE;
 
-    if (!(dev = create_device_by_usb_bus (ctx, bus_number, device_address)))
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
     if ((st = microtouch3m_device_firmware_dump (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
@@ -190,6 +161,7 @@ out:
 
 static int
 run_firmware_update (microtouch3m_context_t *ctx,
+                     bool                    first,
                      uint8_t                 bus_number,
                      uint8_t                 device_address,
                      const char             *path)
@@ -205,7 +177,7 @@ run_firmware_update (microtouch3m_context_t *ctx,
     int                         port_numbers_len;
     int                         reboot_wait_check_retries;
 
-    if (!(dev = create_device_by_usb_bus (ctx, bus_number, device_address)))
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
     port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
@@ -249,7 +221,7 @@ run_firmware_update (microtouch3m_context_t *ctx,
         printf ("[%d/%d] waiting for controller reboot...\n", reboot_wait_check_retries + 1, REBOOT_WAIT_CHECK_RETRIES);
         sleep (REBOOT_WAIT_CHECK_TIMEOUT_SECS);
 
-        dev = create_device_by_usb_location (ctx, real_bus_number, port_numbers, port_numbers_len);
+        dev = create_device (ctx, false, real_bus_number, 0, port_numbers, port_numbers_len);
 
         /* No device found? */
         if (!dev)
@@ -485,11 +457,11 @@ int main (int argc, char **argv)
     if (validate_fw_file)
         ret = run_validate_fw_file (validate_fw_file);
     else if (info)
-        ret = run_info (ctx, bus_number, device_address);
+        ret = run_info (ctx, first, bus_number, device_address);
     else if (firmware_dump)
-        ret = run_firmware_dump (ctx, bus_number, device_address, firmware_dump);
+        ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update)
-        ret = run_firmware_update (ctx, bus_number, device_address, firmware_update);
+        ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update);
     else
         assert (0);
 
