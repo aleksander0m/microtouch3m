@@ -402,7 +402,8 @@ run_in_request (microtouch3m_device_t     *dev,
                 uint16_t                   parameter_value,
                 uint16_t                   parameter_index,
                 struct parameter_report_s *parameter_report,
-                size_t                     parameter_report_size)
+                size_t                     parameter_report_size,
+                enum libusb_error         *out_usb_error)
 {
     int desc_size;
 
@@ -417,6 +418,8 @@ run_in_request (microtouch3m_device_t     *dev,
                                               (uint8_t *) parameter_report,
                                               parameter_report_size,
                                               5000)) < 0) {
+        if (out_usb_error)
+            *out_usb_error = (enum libusb_error) desc_size;
         microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: %s",
                           parameter_cmd, parameter_value, parameter_index, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
@@ -451,7 +454,8 @@ run_out_request (microtouch3m_device_t *dev,
                  uint16_t               parameter_value,
                  uint16_t               parameter_index,
                  const uint8_t         *parameter_data,
-                 size_t                 parameter_data_size)
+                 size_t                 parameter_data_size,
+                 enum libusb_error     *out_usb_error)
 {
     int desc_size;
 
@@ -465,6 +469,8 @@ run_out_request (microtouch3m_device_t *dev,
                                               (uint8_t *) parameter_data,
                                               parameter_data_size,
                                               5000)) < 0) {
+        if (out_usb_error)
+            *out_usb_error = (enum libusb_error) desc_size;
         microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes: %s",
                           parameter_cmd, parameter_value, parameter_index, parameter_data_size, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
@@ -501,14 +507,24 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
                            microtouch3m_device_reset_t  reset)
 {
     microtouch3m_status_t st;
+    enum libusb_error     usb_error;
 
     microtouch3m_log ("requesting controller reset: %s", microtouch3m_device_reset_to_string (reset));
     if ((st = run_out_request (dev,
                                REQUEST_RESET,
                                reset,
                                0x0000,
-                               NULL, 0)) != MICROTOUCH3M_STATUS_OK)
-        return st;
+                               NULL,
+                               0,
+                               &usb_error)) != MICROTOUCH3M_STATUS_OK) {
+        /* EIO on a reboot request is perfectly fine */
+        if ((reset == MICROTOUCH3M_DEVICE_RESET_REBOOT) &&
+            (st == MICROTOUCH3M_STATUS_INVALID_IO) &&
+            (usb_error == LIBUSB_ERROR_PIPE)) {
+            /* noop */
+        } else
+            return st;
+    }
 
     /* Success! */
     microtouch3m_log ("successfully requested controller reset");
@@ -558,7 +574,8 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
                                   PARAMETER_ID_CONTROLLER_EEPROM,
                                   offset,
                                   (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+                                  sizeof (parameter_report),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK)
             return st;
 
         memcpy (&buffer[offset], parameter_report.data, PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE);
@@ -630,7 +647,8 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
                                   PARAMETER_ID_CONTROLLER_NOVRAM,
                                   (CALIBRATION_DATA_BLOCK << 8),
                                   (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+                                  sizeof (parameter_report),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->calibration_data, parameter_report.data, CALIBRATION_DATA_SIZE);
@@ -646,7 +664,8 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
                                   PARAMETER_ID_CONTROLLER_NOVRAM,
                                   (LINEARIZATION_DATA_BLOCK << 8),
                                   (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+                                  sizeof (parameter_report),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->linearization_data, parameter_report.data, LINEARIZATION_DATA_SIZE);
@@ -662,7 +681,8 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
                                   ORIENTATION_PARAMETER_NUMBER,
                                   0x0000,
                                   (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+                                  sizeof (parameter_report),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->orientation_data, parameter_report.data, ORIENTATION_DATA_SIZE);
@@ -678,7 +698,8 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
                                   IDENTIFIER_PARAMETER_NUMBER,
                                   0x0000,
                                   (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report))) != MICROTOUCH3M_STATUS_OK)
+                                  sizeof (parameter_report),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->identifier_data, parameter_report.data, IDENTIFIER_DATA_SIZE);
@@ -712,7 +733,8 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
                                PARAMETER_ID_CONTROLLER_NOVRAM,
                                (CALIBRATION_DATA_BLOCK << 8),
                                data->calibration_data,
-                               CALIBRATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+                               CALIBRATION_DATA_SIZE,
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     microtouch3m_log ("restoring linearization data...");
@@ -721,7 +743,8 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
                                PARAMETER_ID_CONTROLLER_NOVRAM,
                                (LINEARIZATION_DATA_BLOCK << 8),
                                data->linearization_data,
-                               LINEARIZATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+                               LINEARIZATION_DATA_SIZE,
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     microtouch3m_log ("restoring orientation data...");
@@ -730,7 +753,8 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
                                ORIENTATION_PARAMETER_NUMBER,
                                0x0000,
                                data->orientation_data,
-                               ORIENTATION_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+                               ORIENTATION_DATA_SIZE,
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     microtouch3m_log ("restoring identifier data...");
@@ -739,7 +763,8 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
                                IDENTIFIER_PARAMETER_NUMBER,
                                0x0000,
                                data->identifier_data,
-                               IDENTIFIER_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+                               IDENTIFIER_DATA_SIZE,
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     /* Success! */
@@ -784,7 +809,8 @@ microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
                                    PARAMETER_ID_CONTROLLER_EEPROM,
                                    offset,
                                    &buffer[offset],
-                                   FIRMWARE_UPDATE_DATA_SIZE)) != MICROTOUCH3M_STATUS_OK)
+                                   FIRMWARE_UPDATE_DATA_SIZE,
+                                   NULL)) != MICROTOUCH3M_STATUS_OK)
             return st;
     }
 
