@@ -798,7 +798,7 @@ microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
 {
     uint16_t     offset;
     unsigned int i;
-    float        progress;
+    float        progress = 0.0;
 
     assert (dev);
     assert (buffer);
