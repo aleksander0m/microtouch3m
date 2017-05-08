@@ -297,6 +297,9 @@ microtouch3m_device_unref (microtouch3m_device_t *dev)
     if (__sync_fetch_and_sub (&dev->refcount, 1) != 1)
         return;
 
+    if (dev->usbhandle)
+        libusb_close (dev->usbhandle);
+
     assert (dev->usbdev);
     libusb_unref_device (dev->usbdev);
 

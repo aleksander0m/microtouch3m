@@ -108,7 +108,6 @@ run_info (microtouch3m_context_t *ctx,
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         return EXIT_FAILURE;
 
-    microtouch3m_device_close (dev);
     microtouch3m_device_unref (dev);
     return EXIT_SUCCESS;
 }
@@ -145,10 +144,8 @@ run_firmware_dump (microtouch3m_context_t *ctx,
     ret = EXIT_SUCCESS;
 
 out:
-    if (dev) {
-        microtouch3m_device_close (dev);
+    if (dev)
         microtouch3m_device_unref (dev);
-    }
 
     return ret;
 }
@@ -211,7 +208,6 @@ run_firmware_update (microtouch3m_context_t *ctx,
     }
 
     /* Forget about the device */
-    microtouch3m_device_close (dev);
     microtouch3m_device_unref (dev);
     dev = NULL;
 
@@ -247,10 +243,8 @@ run_firmware_update (microtouch3m_context_t *ctx,
     ret = EXIT_SUCCESS;
 
 out:
-    if (dev) {
-        microtouch3m_device_close (dev);
+    if (dev)
         microtouch3m_device_unref (dev);
-    }
     free (dev_data);
     return ret;
 }
