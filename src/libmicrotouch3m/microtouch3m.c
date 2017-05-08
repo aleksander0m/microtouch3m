@@ -110,6 +110,10 @@ struct microtouch3m_device_s {
     microtouch3m_context_t *ctx;
     libusb_device          *usbdev;
     libusb_device_handle   *usbhandle;
+    /* FW operation progress callback */
+    microtouch3m_device_firmware_progress_f *progress_callback;
+    float                                    progress_freq;
+    void                                    *progress_user_data;
 };
 
 static microtouch3m_device_t *
@@ -504,6 +508,39 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 }
 
 /******************************************************************************/
+/* Firmware common */
+
+void
+microtouch3m_device_firmware_progress_register (microtouch3m_device_t                   *dev,
+                                                microtouch3m_device_firmware_progress_f *callback,
+                                                float                                    freq,
+                                                void                                    *user_data)
+{
+    dev->progress_callback  = callback;
+    dev->progress_freq      = freq;
+    dev->progress_user_data = user_data;
+}
+
+static void
+report_progress (microtouch3m_device_t *dev,
+                 int                    current_step,
+                 int                    total_steps,
+                 float                 *progress)
+{
+    float new_progress;
+
+    if (!dev->progress_callback)
+        return;
+
+    new_progress = 100.0 * (((float) current_step) / ((float) total_steps));
+    if (!progress || (new_progress > (*progress + dev->progress_freq))) {
+        dev->progress_callback (dev, new_progress, dev->progress_user_data);
+        if (progress)
+            *progress = new_progress;
+    }
+}
+
+/******************************************************************************/
 /* Firmware dump */
 
 #define PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE 64
@@ -520,6 +557,7 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
 {
     uint16_t     offset;
     unsigned int i;
+    float        progress = 0.0;
 
     assert (dev);
     assert (buffer);
@@ -551,7 +589,11 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
             return st;
 
         memcpy (&buffer[offset], parameter_report.data, PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE);
+        report_progress (dev, offset, MICROTOUCH3M_FW_IMAGE_SIZE, &progress);
     }
+
+    if (progress < 100.0)
+        report_progress (dev, MICROTOUCH3M_FW_IMAGE_SIZE, MICROTOUCH3M_FW_IMAGE_SIZE, NULL);
 
     /* Success! */
     microtouch3m_log ("successfully read firmware from controller EEPROM");
@@ -756,6 +798,7 @@ microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
 {
     uint16_t     offset;
     unsigned int i;
+    float        progress;
 
     assert (dev);
     assert (buffer);
@@ -784,7 +827,12 @@ microtouch3m_device_firmware_update (microtouch3m_device_t *dev,
                                    FIRMWARE_UPDATE_DATA_SIZE,
                                    NULL)) != MICROTOUCH3M_STATUS_OK)
             return st;
+
+        report_progress (dev, offset, MICROTOUCH3M_FW_IMAGE_SIZE, &progress);
     }
+
+    if (progress < 100.0)
+        report_progress (dev, MICROTOUCH3M_FW_IMAGE_SIZE, MICROTOUCH3M_FW_IMAGE_SIZE, NULL);
 
     /* Success! */
     microtouch3m_log ("successfully written firmware to controller EEPROM");

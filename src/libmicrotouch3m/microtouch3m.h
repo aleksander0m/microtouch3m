@@ -287,6 +287,37 @@ microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *de
 #define MICROTOUCH3M_FW_IMAGE_SIZE (size_t) 0x8000
 
 /**
+ * microtouch3m_device_firmware_progress_f:
+ * @dev: a #microtouch3m_device_t.
+ * @progress: the operation progress, in percentage.
+ * @user_data: user provided data when registering the callback.
+ *
+ * Callback operation that may be registered if the user needs to show the
+ * progress of the ongoing operation.
+ *
+ */
+typedef void (microtouch3m_device_firmware_progress_f) (microtouch3m_device_t *dev,
+                                                        float                  progress,
+                                                        void                  *user_data);
+
+/**
+ * microtouch3m_device_firmware_progress_register:
+ * @dev: a #microtouch3m_device_t.
+ * @callback: the progress callback, or %NULL.
+ * @freq: how often to report updates, in percentage.
+ * @user_data: user provided data to be used when @callback is called.
+ *
+ * Registers a callback operation to be called during firmware operations
+ * (either dump or update).
+ *
+ * If %NULL given as @callback, no progress operation will be reported.
+ */
+void microtouch3m_device_firmware_progress_register (microtouch3m_device_t                   *dev,
+                                                     microtouch3m_device_firmware_progress_f *callback,
+                                                     float                                    freq,
+                                                     void                                    *user_data);
+
+/**
  * microtouch3m_device_firmware_dump:
  * @dev: a #microtouch3m_device_t.
  * @buffer: buffer where the firmware contents will be stored.
