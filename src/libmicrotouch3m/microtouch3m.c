@@ -417,8 +417,8 @@ run_in_request (microtouch3m_device_t     *dev,
                                               (uint8_t *) parameter_report,
                                               parameter_report_size,
                                               5000)) < 0) {
-        microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x",
-                          parameter_cmd, parameter_value, parameter_index);
+        microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: %s",
+                          parameter_cmd, parameter_value, parameter_index, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
     }
 
@@ -465,8 +465,8 @@ run_out_request (microtouch3m_device_t *dev,
                                               (uint8_t *) parameter_data,
                                               parameter_data_size,
                                               5000)) < 0) {
-        microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes",
-                          parameter_cmd, parameter_value, parameter_index, parameter_data_size);
+        microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes: %s",
+                          parameter_cmd, parameter_value, parameter_index, parameter_data_size, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
     }
 
