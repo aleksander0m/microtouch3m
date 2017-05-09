@@ -441,9 +441,9 @@ run_parameter_in_request (microtouch3m_device_t     *dev,
         return MICROTOUCH3M_STATUS_INVALID_DATA;
     }
 
-    if (parameter_report->data_size != (parameter_report_size - sizeof (struct parameter_report_s))) {
+    if (le16toh (parameter_report->data_size) != (parameter_report_size - sizeof (struct parameter_report_s))) {
         microtouch3m_log ("error: couldn't run parameter IN request 0x%02x value 0x%04x index 0x%04x: invalid read data size reported (%d != %d)",
-                          parameter_cmd, parameter_value, parameter_index, parameter_report->data_size, (parameter_report_size - sizeof (struct parameter_report_s)));
+                          parameter_cmd, parameter_value, parameter_index, le16toh (parameter_report->data_size), (parameter_report_size - sizeof (struct parameter_report_s)));
         return MICROTOUCH3M_STATUS_INVALID_FORMAT;
     }
 
