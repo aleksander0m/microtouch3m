@@ -27,8 +27,12 @@
 
 #include "ihex.h"
 
-#if !defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
-# error GCC built-in atomic method support is required
+#undef  GCC_VERSION
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+
+/* in GCC version >= 4.1.0 we can use the __sync built-in atomic operations */
+#if !defined(GCC_VERSION) || GCC_VERSION < 40100
+# error GCC >= 4.1.0 required for built-in atomic method support
 #endif
 
 /******************************************************************************/
