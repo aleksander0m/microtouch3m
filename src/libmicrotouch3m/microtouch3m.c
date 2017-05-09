@@ -8,16 +8,16 @@
 
 #include <config.h>
 
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <malloc.h>
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
-#define _BSD_SOURCE
 #include <endian.h>
-
 #include <libusb.h>
 
 #include "common.h"
