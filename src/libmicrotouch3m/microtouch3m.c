@@ -403,7 +403,7 @@ run_in_request (microtouch3m_device_t     *dev,
                                               5000)) < 0) {
         if (out_usb_error)
             *out_usb_error = (enum libusb_error) desc_size;
-        microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: %s",
+        microtouch3m_log ("warn: while running IN request 0x%02x value 0x%04x index 0x%04x: %s",
                           parameter_cmd, parameter_value, parameter_index, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
     }
@@ -477,7 +477,7 @@ run_out_request (microtouch3m_device_t *dev,
                                               5000)) < 0) {
         if (out_usb_error)
             *out_usb_error = (enum libusb_error) desc_size;
-        microtouch3m_log ("error: couldn't run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes: %s",
+        microtouch3m_log ("warn: while running OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes: %s",
                           parameter_cmd, parameter_value, parameter_index, parameter_data_size, libusb_strerror (desc_size));
         return MICROTOUCH3M_STATUS_INVALID_IO;
     }
