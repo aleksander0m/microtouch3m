@@ -238,6 +238,19 @@ microtouch3m_status_t microtouch3m_device_open (microtouch3m_device_t *dev);
 void microtouch3m_device_close (microtouch3m_device_t *dev);
 
 /******************************************************************************/
+/* Query controller ID */
+
+microtouch3m_status_t microtouch3m_device_query_controller_id (microtouch3m_device_t *dev,
+                                                               uint16_t              *controller_type,
+                                                               uint8_t               *firmware_major,
+                                                               uint8_t               *firmware_minor,
+                                                               uint8_t               *features,
+                                                               uint16_t              *constants_checksum,
+                                                               uint16_t              *max_param_write,
+                                                               uint32_t              *pc_checksum,
+                                                               uint16_t              *asic_type);
+
+/******************************************************************************/
 /* Reset */
 
 /**

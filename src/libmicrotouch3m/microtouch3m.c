@@ -15,6 +15,8 @@
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
+#define _BSD_SOURCE
+#include <endian.h>
 
 #include <libusb.h>
 
@@ -353,6 +355,7 @@ enum request_e {
     REQUEST_GET_PARAMETER_BLOCK = 0x02,
     REQUEST_SET_PARAMETER_BLOCK = 0x03,
     REQUEST_RESET               = 0x07,
+    REQUEST_CONTROLLER_ID       = 0x0A,
     REQUEST_GET_PARAMETER       = 0x10,
     REQUEST_SET_PARAMETER       = 0x11,
 };
@@ -377,22 +380,22 @@ run_in_request (microtouch3m_device_t     *dev,
                 enum request_e             parameter_cmd,
                 uint16_t                   parameter_value,
                 uint16_t                   parameter_index,
-                struct parameter_report_s *parameter_report,
-                size_t                     parameter_report_size,
+                uint8_t                   *parameter_data,
+                size_t                     parameter_data_size,
                 enum libusb_error         *out_usb_error)
 {
     int desc_size;
 
     assert (dev);
-    assert (parameter_report);
+    assert (parameter_data);
 
     if ((desc_size = libusb_control_transfer (dev->usbhandle,
                                               LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
                                               parameter_cmd,
                                               parameter_value,
                                               parameter_index,
-                                              (uint8_t *) parameter_report,
-                                              parameter_report_size,
+                                              parameter_data,
+                                              parameter_data_size,
                                               5000)) < 0) {
         if (out_usb_error)
             *out_usb_error = (enum libusb_error) desc_size;
@@ -401,26 +404,49 @@ run_in_request (microtouch3m_device_t     *dev,
         return MICROTOUCH3M_STATUS_INVALID_IO;
     }
 
-    if (desc_size != parameter_report_size) {
+    if (desc_size != parameter_data_size) {
         microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: invalid data size read (%d != %d)",
-                          parameter_cmd, parameter_value, parameter_index, desc_size, parameter_report_size);
+                          parameter_cmd, parameter_value, parameter_index, desc_size, parameter_data_size);
         return MICROTOUCH3M_STATUS_INVALID_DATA;
     }
 
+    microtouch3m_log ("successfully run IN request 0x%02x value 0x%04x index 0x%04x",
+                      parameter_cmd, parameter_value, parameter_index);
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+static microtouch3m_status_t
+run_parameter_in_request (microtouch3m_device_t     *dev,
+                          enum request_e             parameter_cmd,
+                          uint16_t                   parameter_value,
+                          uint16_t                   parameter_index,
+                          struct parameter_report_s *parameter_report,
+                          size_t                     parameter_report_size,
+                          enum libusb_error         *out_usb_error)
+{
+    microtouch3m_status_t st;
+
+    if ((st = run_in_request (dev,
+                              parameter_cmd,
+                              parameter_value,
+                              parameter_index,
+                              (uint8_t *) parameter_report,
+                              parameter_report_size,
+                              out_usb_error)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
     if (parameter_report->report_id != REPORT_ID_PARAMETER) {
-        microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: invalid report id (%d != %d)",
+        microtouch3m_log ("error: couldn't run parameter IN request 0x%02x value 0x%04x index 0x%04x: invalid report id (%d != %d)",
                           parameter_cmd, parameter_value, parameter_index, parameter_report->report_id, REPORT_ID_PARAMETER);
         return MICROTOUCH3M_STATUS_INVALID_DATA;
     }
 
     if (parameter_report->data_size != (parameter_report_size - sizeof (struct parameter_report_s))) {
-        microtouch3m_log ("error: couldn't run IN request 0x%02x value 0x%04x index 0x%04x: invalid read data size reported (%d != %d)",
+        microtouch3m_log ("error: couldn't run parameter IN request 0x%02x value 0x%04x index 0x%04x: invalid read data size reported (%d != %d)",
                           parameter_cmd, parameter_value, parameter_index, parameter_report->data_size, (parameter_report_size - sizeof (struct parameter_report_s)));
         return MICROTOUCH3M_STATUS_INVALID_FORMAT;
     }
 
-    microtouch3m_log ("successfully run IN request 0x%02x value 0x%04x index 0x%04x",
-                      parameter_cmd, parameter_value, parameter_index);
     return MICROTOUCH3M_STATUS_OK;
 }
 
@@ -460,6 +486,68 @@ run_out_request (microtouch3m_device_t *dev,
 
     microtouch3m_log ("successfully run OUT request 0x%02x value 0x%04x index 0x%04x data %u bytes",
                       parameter_cmd, parameter_value, parameter_index, parameter_data_size);
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Query controller ID */
+
+struct report_controller_id_s {
+    uint8_t  report_id;
+    uint16_t controller_type;
+    uint8_t  firmware_major;
+    uint8_t  firmware_minor;
+    uint8_t  features;
+    uint16_t constants_checksum;
+    uint16_t max_param_write;
+    uint8_t  reserved[8];
+    uint32_t pc_checksum;
+    uint16_t asic_type;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_query_controller_id (microtouch3m_device_t *dev,
+                                         uint16_t              *controller_type,
+                                         uint8_t               *firmware_major,
+                                         uint8_t               *firmware_minor,
+                                         uint8_t               *features,
+                                         uint16_t              *constants_checksum,
+                                         uint16_t              *max_param_write,
+                                         uint32_t              *pc_checksum,
+                                         uint16_t              *asic_type)
+{
+    microtouch3m_status_t         st;
+    struct report_controller_id_s report_controller_id = { 0 };
+
+    microtouch3m_log ("querying controller id");
+    if ((st = run_in_request (dev,
+                              REQUEST_CONTROLLER_ID,
+                              0x0000,
+                              0x0000,
+                              (uint8_t *) &report_controller_id,
+                              sizeof (report_controller_id),
+                              NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    if (controller_type)
+        *controller_type = le16toh (report_controller_id.controller_type);
+    if (firmware_major)
+        *firmware_major = report_controller_id.firmware_major;
+    if (firmware_minor)
+        *firmware_minor = report_controller_id.firmware_minor;
+    if (features)
+        *features = report_controller_id.features;
+    if (constants_checksum)
+        *constants_checksum = le16toh (report_controller_id.constants_checksum);
+    if (max_param_write)
+        *max_param_write = le16toh (report_controller_id.max_param_write);
+    if (pc_checksum)
+        *pc_checksum = le32toh (report_controller_id.pc_checksum);
+    if (asic_type)
+        *asic_type = le16toh (report_controller_id.asic_type);
+
+    /* Success! */
+    microtouch3m_log ("successfully queried controller id");
     return MICROTOUCH3M_STATUS_OK;
 }
 
@@ -579,13 +667,13 @@ microtouch3m_device_firmware_dump (microtouch3m_device_t *dev,
         struct parameter_report_firmware_dump_s parameter_report;
         microtouch3m_status_t                   st;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_GET_PARAMETER_BLOCK,
-                                  PARAMETER_ID_CONTROLLER_EEPROM,
-                                  offset,
-                                  (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_parameter_in_request (dev,
+                                            REQUEST_GET_PARAMETER_BLOCK,
+                                            PARAMETER_ID_CONTROLLER_EEPROM,
+                                            offset,
+                                            (struct parameter_report_s *) &parameter_report,
+                                            sizeof (parameter_report),
+                                            NULL)) != MICROTOUCH3M_STATUS_OK)
             return st;
 
         memcpy (&buffer[offset], parameter_report.data, PARAMETER_REPORT_FIRMWARE_DUMP_DATA_SIZE);
@@ -656,13 +744,13 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     {
         struct parameter_report_calibration_data_s parameter_report;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_GET_PARAMETER_BLOCK,
-                                  PARAMETER_ID_CONTROLLER_NOVRAM,
-                                  (CALIBRATION_DATA_BLOCK << 8),
-                                  (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_parameter_in_request (dev,
+                                            REQUEST_GET_PARAMETER_BLOCK,
+                                            PARAMETER_ID_CONTROLLER_NOVRAM,
+                                            (CALIBRATION_DATA_BLOCK << 8),
+                                            (struct parameter_report_s *) &parameter_report,
+                                            sizeof (parameter_report),
+                                            NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->calibration_data, parameter_report.data, CALIBRATION_DATA_SIZE);
@@ -673,13 +761,13 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     {
         struct parameter_report_linearization_data_s parameter_report;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_GET_PARAMETER_BLOCK,
-                                  PARAMETER_ID_CONTROLLER_NOVRAM,
-                                  (LINEARIZATION_DATA_BLOCK << 8),
-                                  (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_parameter_in_request (dev,
+                                            REQUEST_GET_PARAMETER_BLOCK,
+                                            PARAMETER_ID_CONTROLLER_NOVRAM,
+                                            (LINEARIZATION_DATA_BLOCK << 8),
+                                            (struct parameter_report_s *) &parameter_report,
+                                            sizeof (parameter_report),
+                                            NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->linearization_data, parameter_report.data, LINEARIZATION_DATA_SIZE);
@@ -690,13 +778,13 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     {
         struct parameter_report_orientation_data_s parameter_report;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_GET_PARAMETER,
-                                  ORIENTATION_PARAMETER_NUMBER,
-                                  0x0000,
-                                  (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_parameter_in_request (dev,
+                                            REQUEST_GET_PARAMETER,
+                                            ORIENTATION_PARAMETER_NUMBER,
+                                            0x0000,
+                                            (struct parameter_report_s *) &parameter_report,
+                                            sizeof (parameter_report),
+                                            NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->orientation_data, parameter_report.data, ORIENTATION_DATA_SIZE);
@@ -707,13 +795,13 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     {
         struct parameter_report_identifier_data_s parameter_report;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_GET_PARAMETER,
-                                  IDENTIFIER_PARAMETER_NUMBER,
-                                  0x0000,
-                                  (struct parameter_report_s *) &parameter_report,
-                                  sizeof (parameter_report),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_parameter_in_request (dev,
+                                            REQUEST_GET_PARAMETER,
+                                            IDENTIFIER_PARAMETER_NUMBER,
+                                            0x0000,
+                                            (struct parameter_report_s *) &parameter_report,
+                                            sizeof (parameter_report),
+                                            NULL)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
         memcpy (data->identifier_data, parameter_report.data, IDENTIFIER_DATA_SIZE);
