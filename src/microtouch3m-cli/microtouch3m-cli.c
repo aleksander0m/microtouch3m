@@ -8,6 +8,7 @@
 
 #include <config.h>
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -16,6 +17,9 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <common.h>
 
@@ -214,17 +218,100 @@ out:
 #define REBOOT_WAIT_CHECK_RETRIES      30
 #define REBOOT_WAIT_CHECK_TIMEOUT_SECS  2
 
+static char *
+save_device_data (const microtouch3m_device_data_t *dev_data,
+                  size_t                            dev_data_size)
+{
+    char    *dev_data_tmpfile = NULL;
+    int      fd;
+    ssize_t  written = 0;
+
+    dev_data_tmpfile = strdup ("/tmp/microtouch3m-devdata-XXXXXX");
+    if (!dev_data_tmpfile)
+        return NULL;
+
+    if ((fd = mkstemp (dev_data_tmpfile)) < 0) {
+        fprintf (stderr, "error: couldn't create tmp file to backup device data: %s\n", strerror (errno));
+        goto out;
+    }
+
+    written = write (fd, dev_data, dev_data_size);
+    if (written != dev_data_size) {
+        fprintf (stderr, "error: couldn't write backup device data to tmp file: %s\n", strerror (errno));
+        goto out;
+    }
+
+out:
+    if (!(fd < 0))
+        close (fd);
+
+    if (written != dev_data_size) {
+        free (dev_data_tmpfile);
+        return NULL;
+    }
+
+    return dev_data_tmpfile;
+}
+
+#define INITIAL_BUFFER_SIZE 512
+
+static microtouch3m_device_data_t *
+load_device_data (const char *path,
+                  size_t     *dev_data_size)
+{
+    int      fd;
+    uint8_t *buffer = NULL;
+    ssize_t  n_read = 0;
+
+    fd = open (path, O_RDONLY);
+    if (fd < 0) {
+        fprintf (stderr, "error: couldn't open file with backup device data: %s\n", strerror (errno));
+        goto out;
+    }
+
+    buffer = malloc (INITIAL_BUFFER_SIZE);
+    if (!buffer) {
+        fprintf (stderr, "error: couldn't allocate buffer to store device data\n");
+        goto out;
+    }
+
+    n_read = read (fd, buffer, INITIAL_BUFFER_SIZE);
+    if (n_read <= 0) {
+        fprintf (stderr, "error: couldn't read device data: %s\n", strerror (errno));
+        goto out;
+    }
+
+out:
+    if (!(fd < 0))
+        close (fd);
+
+    if (n_read <= 0) {
+        free (buffer);
+        return NULL;
+    }
+
+    if (dev_data_size)
+        *dev_data_size = (size_t) n_read;
+
+    buffer = realloc (buffer, n_read);
+
+    return (microtouch3m_device_data_t *) buffer;
+}
+
 static int
 run_firmware_update (microtouch3m_context_t *ctx,
                      bool                    first,
                      uint8_t                 bus_number,
                      uint8_t                 device_address,
-                     const char             *path)
+                     const char             *path,
+                     const char             *data_backup_path)
 {
     microtouch3m_status_t       st;
     uint8_t                     buffer[MICROTOUCH3M_FW_IMAGE_SIZE];
     microtouch3m_device_data_t *dev_data = NULL;
+    size_t                      dev_data_size = 0;
     microtouch3m_device_t      *dev;
+    char                       *dev_data_tmpfile = NULL;
     int                         ret = EXIT_FAILURE;
     uint8_t                     real_bus_number;
     uint8_t                     real_device_address;
@@ -237,15 +324,48 @@ run_firmware_update (microtouch3m_context_t *ctx,
 
     port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
 
+    printf ("reading firmware file...\n");
     if ((st = microtouch3m_firmware_file_read (path, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't load firmware file: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
 
-    printf ("backing up device data...\n");
-    if ((st = microtouch3m_device_backup_data (dev, &dev_data)) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't backup device data: %s\n", microtouch3m_status_to_string (st));
-        goto out;
+    /* If a data backup given, read it instead of querying device */
+    if (data_backup_path) {
+        size_t loaded_dev_data_size;
+
+        printf ("loading device data from external file...\n");
+        if ((st = microtouch3m_device_backup_data (dev, NULL, &dev_data_size)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't query device data size: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+
+        dev_data = load_device_data (data_backup_path, &loaded_dev_data_size);
+        if (!dev_data) {
+            fprintf (stderr, "error: invalid device data backup file given\n");
+            goto out;
+        }
+        if (dev_data_size != loaded_dev_data_size) {
+            fprintf (stderr, "error: invalid device data backup file given: size mismatch (%zu != %zu)\n", dev_data_size, loaded_dev_data_size);
+            goto out;
+        }
+        printf ("device data loaded from: %s\n", data_backup_path);
+    } else {
+        /* Load device data and back it up */
+
+        printf ("backing up device data...\n");
+        if ((st = microtouch3m_device_backup_data (dev, &dev_data, &dev_data_size)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't backup device data: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+
+        printf ("storing device data in temporary file...\n");
+        dev_data_tmpfile = save_device_data (dev_data, dev_data_size);
+        if (!dev_data_tmpfile) {
+            fprintf (stderr, "error: couldn't backup device data in external file\n");
+            goto out;
+        }
+        printf ("device data stored in: %s\n", dev_data_tmpfile);
     }
 
     printf ("downloading firmware to device EEPROM...\n");
@@ -270,6 +390,8 @@ run_firmware_update (microtouch3m_context_t *ctx,
     /* Forget about the device */
     microtouch3m_device_unref (dev);
     dev = NULL;
+
+    goto out;
 
     /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
      * deal as this operation isn't something you'd be doing often. */
@@ -299,13 +421,26 @@ run_firmware_update (microtouch3m_context_t *ctx,
         goto out;
     }
 
+    if (dev_data_tmpfile) {
+        printf ("removing device data temporary file...\n");
+        unlink (dev_data_tmpfile);
+    }
+
     printf ("successfully updated device firmware\n");
     ret = EXIT_SUCCESS;
 
 out:
+    if (ret != EXIT_SUCCESS && dev_data_tmpfile) {
+        fprintf (stderr, "\n");
+        fprintf (stderr, "You can retry the download with the backed up data using the following additional option:\n");
+        fprintf (stderr, "  --firmware-data-backup %s\n", dev_data_tmpfile);
+        fprintf (stderr, "\n");
+    }
+
     if (dev)
         microtouch3m_device_unref (dev);
     free (dev_data);
+    free (dev_data_tmpfile);
     return ret;
 }
 
@@ -335,21 +470,22 @@ print_help (void)
             "Usage: " PROGRAM_NAME " <option>\n"
             "\n"
             "Generic device selection options\n"
-            "  -s, --bus-dev=[BUS]:[DEV]        Select device by bus and/or device number.\n"
-            "  -f, --first                      Select first device found.\n"
+            "  -s, --bus-dev=[BUS]:[DEV]          Select device by bus and/or device number.\n"
+            "  -f, --first                        Select first device found.\n"
             "\n"
             "Device actions:\n"
-            "  -i, --info                       Show device information.\n"
-            "  -x, --firmware-dump=[PATH]       Dump firmware to a file.\n"
-            "  -u, --firmware-update=[PATH]     Update firmware in the device.\n"
+            "  -i, --info                         Show device information.\n"
+            "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
+            "  -u, --firmware-update=[PATH]       Update firmware in the device.\n"
+            "  -B, --firmware-data-backup=[PATH]  Use the given data backup for the update operation.\n"
             "\n"
             "Firmware actions:\n"
-            "  -z, --validate-fw-file=[PATH]    Validate firmware file.\n"
+            "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
             "\n"
             "Common options:\n"
-            "  -d, --debug                      Enable verbose logging.\n"
-            "  -h, --help                       Show help.\n"
-            "  -v, --version                    Show version.\n"
+            "  -d, --debug                        Enable verbose logging.\n"
+            "  -h, --help                         Show help.\n"
+            "  -v, --version                      Show version.\n"
             "\n");
 }
 
@@ -417,21 +553,23 @@ int main (int argc, char **argv)
     bool                    info                      = false;
     char                   *firmware_dump             = NULL;
     char                   *firmware_update           = NULL;
+    char                   *firmware_data_backup      = NULL;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
 
     const struct option longopts[] = {
-        { "bus-dev",          required_argument, 0, 's' },
-        { "first",            no_argument,       0, 'f' },
-        { "info",             no_argument,       0, 'i' },
-        { "firmware-dump",    required_argument, 0, 'x' },
-        { "firmware-update",  required_argument, 0, 'u' },
-        { "validate-fw-file", required_argument, 0, 'z' },
-        { "debug",            no_argument,       0, 'd' },
-        { "version",          no_argument,       0, 'v' },
-        { "help",             no_argument,       0, 'h' },
-        { 0,                  0,                 0, 0   },
+        { "bus-dev",              required_argument, 0, 's' },
+        { "first",                no_argument,       0, 'f' },
+        { "info",                 no_argument,       0, 'i' },
+        { "firmware-dump",        required_argument, 0, 'x' },
+        { "firmware-update",      required_argument, 0, 'u' },
+        { "firmware-data-backup", required_argument, 0, 'B' },
+        { "validate-fw-file",     required_argument, 0, 'z' },
+        { "debug",                no_argument,       0, 'd' },
+        { "version",              no_argument,       0, 'v' },
+        { "help",                 no_argument,       0, 'h' },
+        { 0,                      0,                 0, 0   },
     };
 
     /* turn off getopt error message */
@@ -453,6 +591,9 @@ int main (int argc, char **argv)
             break;
         case 'u':
             firmware_update = strdup (optarg);
+            break;
+        case 'B':
+            firmware_data_backup = strdup (optarg);
             break;
         case 'z':
             validate_fw_file = strdup (optarg);
@@ -479,6 +620,11 @@ int main (int argc, char **argv)
     }
     if (n_actions == 0) {
         fprintf (stderr, "error: no actions requested\n");
+        return EXIT_FAILURE;
+    }
+
+    if (firmware_data_backup && !firmware_update) {
+        fprintf (stderr, "error: --firmware-data-backup only applicable when --firware-update is requested\n");
         return EXIT_FAILURE;
     }
 
@@ -516,7 +662,7 @@ int main (int argc, char **argv)
     else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update)
-        ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update);
+        ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, firmware_data_backup);
     else
         assert (0);
 
@@ -526,6 +672,7 @@ out:
     free (bus_number_device_address);
     free (firmware_dump);
     free (firmware_update);
+    free (firmware_data_backup);
     free (validate_fw_file);
     return ret;
 }
