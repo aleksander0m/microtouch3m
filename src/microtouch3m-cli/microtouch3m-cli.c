@@ -391,8 +391,6 @@ run_firmware_update (microtouch3m_context_t *ctx,
     microtouch3m_device_unref (dev);
     dev = NULL;
 
-    goto out;
-
     /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
      * deal as this operation isn't something you'd be doing often. */
     for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
