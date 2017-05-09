@@ -732,13 +732,20 @@ struct microtouch3m_device_data_s {
 
 microtouch3m_status_t
 microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
-                                 microtouch3m_device_data_t **out_data)
+                                 microtouch3m_device_data_t **out_data,
+                                 size_t                      *out_data_size)
 {
     microtouch3m_status_t       st;
     microtouch3m_device_data_t *data;
 
     assert (dev);
-    assert (out_data);
+    assert (out_data || out_data_size);
+
+    /* Only interested in size? */
+    if (!out_data && out_data_size) {
+        *out_data_size = sizeof (microtouch3m_device_data_t);
+        return MICROTOUCH3M_STATUS_OK;
+    }
 
     data = calloc (1, sizeof (struct microtouch3m_device_data_s));
     if (!data)
@@ -819,8 +826,11 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
 out:
     if (st != MICROTOUCH3M_STATUS_OK)
         free (data);
-    else
+    else {
+        if (out_data_size)
+            *out_data_size = sizeof (microtouch3m_device_data_t);
         *out_data = data;
+    }
     return st;
 }
 

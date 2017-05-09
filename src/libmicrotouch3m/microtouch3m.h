@@ -373,6 +373,7 @@ typedef struct microtouch3m_device_data_s microtouch3m_device_data_t;
  * microtouch3m_device_backup_data:
  * @dev: a #microtouch3m_device_t.
  * @out_data: output location to store a newly allocated #microtouch3m_device_data_t.
+ * @out_data_size: output location to store the size of @out_data, or %NULL if not required.
  *
  * Backs up the device data.
  *
@@ -382,7 +383,8 @@ typedef struct microtouch3m_device_data_s microtouch3m_device_data_t;
  * Returns: a #microtouch3m_status_t.
  */
 microtouch3m_status_t microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
-                                                       microtouch3m_device_data_t **out_data);
+                                                       microtouch3m_device_data_t **out_data,
+                                                       size_t                      *out_data_size);
 
 /**
  * microtouch3m_device_restore_data:
