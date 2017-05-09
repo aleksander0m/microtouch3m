@@ -332,7 +332,7 @@ run_firmware_update (microtouch3m_context_t *ctx,
 
     /* If a data backup given, read it instead of querying device */
     if (data_backup_path) {
-        size_t loaded_dev_data_size;
+        size_t loaded_dev_data_size = 0;
 
         printf ("loading device data from external file...\n");
         if ((st = microtouch3m_device_backup_data (dev, NULL, &dev_data_size)) != MICROTOUCH3M_STATUS_OK) {
