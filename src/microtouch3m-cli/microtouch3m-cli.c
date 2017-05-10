@@ -20,6 +20,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <inttypes.h>
 
 #include <common.h>
 
@@ -27,6 +29,25 @@
 
 #define PROGRAM_NAME    "microtouch3m-cli"
 #define PROGRAM_VERSION PACKAGE_VERSION
+
+#define CLEAR_LINE "\33[2K\r"
+
+/******************************************************************************/
+/* Signals */
+
+static bool stop_requested;
+
+static void
+sighandler (int signal)
+{
+    stop_requested = true;
+}
+
+static void
+setup_signals (void)
+{
+    signal (SIGINT, sighandler);
+}
 
 /******************************************************************************/
 /* Helper: create device based on bus (or first found) */
@@ -83,8 +104,6 @@ create_device (microtouch3m_context_t *ctx,
 
 /******************************************************************************/
 /* Helper: firmware progress reporting */
-
-#define CLEAR_LINE "\33[2K\r"
 
 static bool disable_progress;
 
@@ -443,6 +462,56 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: scope */
+
+static bool
+async_report_scope (microtouch3m_device_t *dev,
+                    microtouch3m_status_t  status,
+                    uint64_t               ul_signal,
+                    uint64_t               ur_signal,
+                    uint64_t               ll_signal,
+                    uint64_t               lr_signal,
+                    void                  *user_data)
+{
+    printf (CLEAR_LINE);
+    printf ("UL: %8" PRIu64 " | ", ul_signal);
+    printf ("UR: %8" PRIu64 " | ", ur_signal);
+    printf ("LL: %8" PRIu64 " | ", ll_signal);
+    printf ("LR: %8" PRIu64,      lr_signal);
+    fflush (stdout);
+    return !stop_requested;
+}
+
+static int
+run_scope (microtouch3m_context_t *ctx,
+           bool                    first,
+           uint8_t                 bus_number,
+           uint8_t                 device_address)
+{
+    microtouch3m_device_t *dev;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    printf ("Scope mode:\n");
+    if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, NULL)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+    printf ("\n");
+    printf ("Scope mode disabled\n");
+
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* Logging */
 
 static pthread_t main_tid;
@@ -476,6 +545,7 @@ print_help (void)
             "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
             "  -u, --firmware-update=[PATH]       Update firmware in the device.\n"
             "  -B, --firmware-data-backup=[PATH]  Use the given data backup for the update operation.\n"
+            "  -S, --scope                        Run scope mode.\n"
             "\n"
             "Firmware actions:\n"
             "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
@@ -552,6 +622,7 @@ int main (int argc, char **argv)
     char                   *firmware_dump             = NULL;
     char                   *firmware_update           = NULL;
     char                   *firmware_data_backup      = NULL;
+    bool                    scope                     = false;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
@@ -563,6 +634,7 @@ int main (int argc, char **argv)
         { "firmware-dump",        required_argument, 0, 'x' },
         { "firmware-update",      required_argument, 0, 'u' },
         { "firmware-data-backup", required_argument, 0, 'B' },
+        { "scope",                no_argument,       0, 'S' },
         { "validate-fw-file",     required_argument, 0, 'z' },
         { "debug",                no_argument,       0, 'd' },
         { "version",              no_argument,       0, 'v' },
@@ -573,7 +645,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:B:z:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:B:Sz:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -593,6 +665,9 @@ int main (int argc, char **argv)
         case 'B':
             firmware_data_backup = strdup (optarg);
             break;
+        case 'S':
+            scope = true;
+            break;
         case 'z':
             validate_fw_file = strdup (optarg);
             break;
@@ -609,7 +684,7 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions_require_device = info + !!firmware_dump + !!firmware_update;
+    n_actions_require_device = info + !!firmware_dump + !!firmware_update + scope;
     n_actions = !!(validate_fw_file) + n_actions_require_device;
 
     if (n_actions > 1) {
@@ -632,6 +707,9 @@ int main (int argc, char **argv)
         microtouch3m_log_set_handler (log_handler);
         disable_progress = true;
     }
+
+    /* Setup signals */
+    setup_signals ();
 
     /* Initialize library */
     ctx = microtouch3m_context_new ();
@@ -661,6 +739,8 @@ int main (int argc, char **argv)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, firmware_data_backup);
+    else if (scope)
+        ret = run_scope (ctx, first, bus_number, device_address);
     else
         assert (0);
 
