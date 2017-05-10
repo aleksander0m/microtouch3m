@@ -413,6 +413,10 @@ run_firmware_update (microtouch3m_context_t *ctx,
         microtouch3m_device_unref (dev);
         dev = NULL;
 
+	/* Sleep some time before looking for the new device (5s). This is a temporary hack until we know why
+	 * the operation is failing on the iMX51 setup */
+	usleep (5000000);
+
         /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
          * deal as this operation isn't something you'd be doing often. */
         for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
