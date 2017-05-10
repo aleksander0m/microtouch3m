@@ -323,6 +323,7 @@ run_firmware_update (microtouch3m_context_t *ctx,
                      uint8_t                 bus_number,
                      uint8_t                 device_address,
                      const char             *path,
+                     bool                    skip_removing_data_backup,
                      const char             *data_backup_path)
 {
     microtouch3m_status_t       st;
@@ -342,12 +343,6 @@ run_firmware_update (microtouch3m_context_t *ctx,
         goto out;
 
     port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
-
-    printf ("reading firmware file...\n");
-    if ((st = microtouch3m_firmware_file_read (path, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't load firmware file: %s\n", microtouch3m_status_to_string (st));
-        goto out;
-    }
 
     /* If a data backup given, read it instead of querying device */
     if (data_backup_path) {
@@ -387,49 +382,58 @@ run_firmware_update (microtouch3m_context_t *ctx,
         printf ("device data stored in: %s\n", dev_data_tmpfile);
     }
 
-    printf ("downloading firmware to device EEPROM...\n");
-    microtouch3m_device_firmware_progress_register (dev, firmware_progress, 1.0, NULL);
-    if ((st = microtouch3m_device_firmware_update (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't download firmware to device EEPROM: %s\n", microtouch3m_status_to_string (st));
-        goto out;
-    }
-    printf ("\n");
+    /* If path given, perform FW update */
+    if (path) {
+        printf ("reading firmware file...\n");
+        if ((st = microtouch3m_firmware_file_read (path, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't load firmware file: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
 
-    /* The device will change address once rebooted, so we'll monitor that as
-     * well to make sure we don't try to use the device before it's rebooted. */
-    real_bus_number     = microtouch3m_device_get_usb_bus_number (dev);
-    real_device_address = microtouch3m_device_get_usb_device_address (dev);
+        printf ("downloading firmware to device EEPROM...\n");
+        microtouch3m_device_firmware_progress_register (dev, firmware_progress, 1.0, NULL);
+        if ((st = microtouch3m_device_firmware_update (dev, buffer, sizeof (buffer))) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't download firmware to device EEPROM: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+        printf ("\n");
 
-    printf ("rebooting controller...\n");
-    if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_REBOOT)) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't reboot controller: %s\n", microtouch3m_status_to_string (st));
-        goto out;
-    }
+        /* The device will change address once rebooted, so we'll monitor that as
+         * well to make sure we don't try to use the device before it's rebooted. */
+        real_bus_number     = microtouch3m_device_get_usb_bus_number (dev);
+        real_device_address = microtouch3m_device_get_usb_device_address (dev);
 
-    /* Forget about the device */
-    microtouch3m_device_unref (dev);
-    dev = NULL;
+        printf ("rebooting controller...\n");
+        if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_REBOOT)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't reboot controller: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
 
-    /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
-     * deal as this operation isn't something you'd be doing often. */
-    for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
-        printf ("[%d/%d] waiting for controller reboot...\n", reboot_wait_check_retries + 1, REBOOT_WAIT_CHECK_RETRIES);
-        sleep (REBOOT_WAIT_CHECK_TIMEOUT_SECS);
+        /* Forget about the device */
+        microtouch3m_device_unref (dev);
+        dev = NULL;
 
-        dev = create_device (ctx, false, real_bus_number, 0, port_numbers, port_numbers_len);
+        /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
+         * deal as this operation isn't something you'd be doing often. */
+        for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
+            printf ("[%d/%d] waiting for controller reboot...\n", reboot_wait_check_retries + 1, REBOOT_WAIT_CHECK_RETRIES);
+            sleep (REBOOT_WAIT_CHECK_TIMEOUT_SECS);
 
-        /* No device found? */
-        if (!dev)
-            continue;
-        /* Device didn't reboot yet? */
-        if (real_device_address == microtouch3m_device_get_usb_device_address (dev))
-            continue;
-        break;
-    }
+            dev = create_device (ctx, false, real_bus_number, 0, port_numbers, port_numbers_len);
 
-    if (!dev) {
-        fprintf (stderr, "error: controller didn't reboot correctly\n");
-        goto out;
+            /* No device found? */
+            if (!dev)
+                continue;
+            /* Device didn't reboot yet? */
+            if (real_device_address == microtouch3m_device_get_usb_device_address (dev))
+                continue;
+            break;
+        }
+
+        if (!dev) {
+            fprintf (stderr, "error: controller didn't reboot correctly\n");
+            goto out;
+        }
     }
 
     printf ("restoring device data...\n");
@@ -439,18 +443,31 @@ run_firmware_update (microtouch3m_context_t *ctx,
     }
 
     if (dev_data_tmpfile) {
-        printf ("removing device data temporary file...\n");
-        unlink (dev_data_tmpfile);
+        if (skip_removing_data_backup)
+            printf ("NOT removing device data temporary file from: %s\n", dev_data_tmpfile);
+        else {
+            printf ("removing device data temporary file...\n");
+            unlink (dev_data_tmpfile);
+        }
     }
 
-    printf ("successfully updated device firmware\n");
+    if (path)
+        printf ("successfully updated device firmware\n");
+    else
+        printf ("successfully restored device data\n");
+
     ret = EXIT_SUCCESS;
 
 out:
     if (ret != EXIT_SUCCESS && dev_data_tmpfile) {
+        if (path) {
+            fprintf (stderr, "\n");
+            fprintf (stderr, "You can retry the complete firmware update but using the backed up data using the following additional option:\n");
+            fprintf (stderr, "  --firmware-update %s --restore-data-backup %s\n", path, dev_data_tmpfile);
+        }
         fprintf (stderr, "\n");
-        fprintf (stderr, "You can retry the download with the backed up data using the following additional option:\n");
-        fprintf (stderr, "  --firmware-data-backup %s\n", dev_data_tmpfile);
+        fprintf (stderr, "You can retry to just recover the data backup as follows:\n");
+        fprintf (stderr, "  --restore-data-backup %s\n", dev_data_tmpfile);
         fprintf (stderr, "\n");
     }
 
@@ -544,7 +561,8 @@ print_help (void)
             "  -i, --info                         Show device information.\n"
             "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
             "  -u, --firmware-update=[PATH]       Update firmware in the device.\n"
-            "  -B, --firmware-data-backup=[PATH]  Use the given data backup for the update operation.\n"
+            "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
+            "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
             "  -S, --scope                        Run scope mode.\n"
             "\n"
             "Firmware actions:\n"
@@ -554,6 +572,10 @@ print_help (void)
             "  -d, --debug                        Enable verbose logging.\n"
             "  -h, --help                         Show help.\n"
             "  -v, --version                      Show version.\n"
+            "\n"
+            "Notes:\n"
+            "  * The --restore-data-backup may be given as an additional option to the --firmware-update\n"
+            "    command, or alternatively as a command itself.\n"
             "\n");
 }
 
@@ -621,31 +643,33 @@ int main (int argc, char **argv)
     bool                    info                      = false;
     char                   *firmware_dump             = NULL;
     char                   *firmware_update           = NULL;
-    char                   *firmware_data_backup      = NULL;
+    bool                    skip_removing_data_backup = false;
+    char                   *restore_data_backup       = NULL;
     bool                    scope                     = false;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
 
     const struct option longopts[] = {
-        { "bus-dev",              required_argument, 0, 's' },
-        { "first",                no_argument,       0, 'f' },
-        { "info",                 no_argument,       0, 'i' },
-        { "firmware-dump",        required_argument, 0, 'x' },
-        { "firmware-update",      required_argument, 0, 'u' },
-        { "firmware-data-backup", required_argument, 0, 'B' },
-        { "scope",                no_argument,       0, 'S' },
-        { "validate-fw-file",     required_argument, 0, 'z' },
-        { "debug",                no_argument,       0, 'd' },
-        { "version",              no_argument,       0, 'v' },
-        { "help",                 no_argument,       0, 'h' },
-        { 0,                      0,                 0, 0   },
+        { "bus-dev",                   required_argument, 0, 's' },
+        { "first",                     no_argument,       0, 'f' },
+        { "info",                      no_argument,       0, 'i' },
+        { "firmware-dump",             required_argument, 0, 'x' },
+        { "firmware-update",           required_argument, 0, 'u' },
+        { "restore-data-backup",       required_argument, 0, 'B' },
+        { "skip-removing-data-backup", no_argument,       0, 'N' },
+        { "scope",                     no_argument,       0, 'S' },
+        { "validate-fw-file",          required_argument, 0, 'z' },
+        { "debug",                     no_argument,       0, 'd' },
+        { "version",                   no_argument,       0, 'v' },
+        { "help",                      no_argument,       0, 'h' },
+        { 0,                           0,                 0, 0   },
     };
 
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:B:Sz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:NB:Sz:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -662,8 +686,11 @@ int main (int argc, char **argv)
         case 'u':
             firmware_update = strdup (optarg);
             break;
+        case 'N':
+            skip_removing_data_backup = true;
+            break;
         case 'B':
-            firmware_data_backup = strdup (optarg);
+            restore_data_backup = strdup (optarg);
             break;
         case 'S':
             scope = true;
@@ -684,7 +711,7 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions_require_device = info + !!firmware_dump + !!firmware_update + scope;
+    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope;
     n_actions = !!(validate_fw_file) + n_actions_require_device;
 
     if (n_actions > 1) {
@@ -696,9 +723,9 @@ int main (int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (firmware_data_backup && !firmware_update) {
-        fprintf (stderr, "error: --firmware-data-backup only applicable when --firware-update is requested\n");
-        return EXIT_FAILURE;
+    if (skip_removing_data_backup && !firmware_update) {
+        fprintf (stderr, "error: --skip-removing-data-backup can only be run with --firmware-update\n");
+        goto out;
     }
 
     /* Setup library logging */
@@ -737,8 +764,8 @@ int main (int argc, char **argv)
         ret = run_info (ctx, first, bus_number, device_address);
     else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
-    else if (firmware_update)
-        ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, firmware_data_backup);
+    else if (firmware_update || restore_data_backup)
+        ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
     else if (scope)
         ret = run_scope (ctx, first, bus_number, device_address);
     else
@@ -750,7 +777,7 @@ out:
     free (bus_number_device_address);
     free (firmware_dump);
     free (firmware_update);
-    free (firmware_data_backup);
+    free (restore_data_backup);
     free (validate_fw_file);
     return ret;
 }
