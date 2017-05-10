@@ -573,7 +573,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:z:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:B:z:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
