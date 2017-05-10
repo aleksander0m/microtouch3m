@@ -330,10 +330,12 @@ microtouch3m_device_get_usb_location (microtouch3m_device_t *dev,
 microtouch3m_status_t
 microtouch3m_device_open (microtouch3m_device_t *dev)
 {
+    int ret;
+
     assert (dev);
 
-    if (!dev->usbhandle && libusb_open (dev->usbdev, &dev->usbhandle) < 0) {
-        microtouch3m_log ("error: couldn't open usb device");
+    if (!dev->usbhandle && ((ret = libusb_open (dev->usbdev, &dev->usbhandle)) < 0)) {
+        microtouch3m_log ("error: couldn't open usb device: %s", libusb_strerror (ret));
         return MICROTOUCH3M_STATUS_FAILED;
     }
 
