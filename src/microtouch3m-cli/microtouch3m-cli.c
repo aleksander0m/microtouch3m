@@ -38,7 +38,7 @@
 static bool stop_requested;
 
 static void
-sighandler (int signal)
+sighandler (int sig)
 {
     stop_requested = true;
 }
