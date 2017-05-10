@@ -23,6 +23,7 @@ libmicrotouch3m_la_LIBADD = \
 
 libmicrotouch3m_la_LDFLAGS = \
 	$(LIBUSB_LIBS) \
+	-lm \
 	$(NULL)
 
 include_HEADERS = \

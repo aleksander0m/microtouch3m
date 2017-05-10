@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <endian.h>
 #include <libusb.h>
+#include <math.h>
 
 #include "common.h"
 
@@ -358,8 +359,10 @@ microtouch3m_device_close (microtouch3m_device_t *dev)
 /* IN/OUT requests */
 
 enum request_e {
+    REQUEST_ASYNC_SET_REPORT    = 0x01,
     REQUEST_GET_PARAMETER_BLOCK = 0x02,
     REQUEST_SET_PARAMETER_BLOCK = 0x03,
+    REQUEST_STATUS              = 0x06,
     REQUEST_RESET               = 0x07,
     REQUEST_CONTROLLER_ID       = 0x0A,
     REQUEST_GET_PARAMETER       = 0x10,
@@ -372,7 +375,14 @@ enum parameter_id_e {
 };
 
 enum report_id_e {
-    REPORT_ID_PARAMETER = 0x04,
+    REPORT_ID_COORDINATE_DATA = 0x0001,
+    REPORT_ID_SCOPE_DATA      = 0x0002,
+    REPORT_ID_PARAMETER       = 0x0004,
+};
+
+enum async_set_report_e {
+    ASYNC_SET_REPORT_DISABLE = 0x0000,
+    ASYNC_SET_REPORT_ENABLE  = 0x0001,
 };
 
 struct parameter_report_s {
@@ -598,6 +608,177 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 
     /* Success! */
     microtouch3m_log ("successfully requested controller reset");
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Device async report operation */
+
+#define MAX_INTERRUPT_ENDPOINT_TRANSFER 32
+
+struct report_scope_s {
+    uint8_t  report_id;
+    uint16_t wtf;
+    uint32_t ul_a;
+    uint32_t ul_b;
+    uint32_t ur_a;
+    uint32_t ur_b;
+    uint32_t ll_a;
+    uint32_t ll_b;
+    uint32_t lr_a;
+    uint32_t lr_b;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_monitor_async_reports (microtouch3m_device_t                    *dev,
+                                           microtouch3m_device_async_report_scope_f *callback,
+                                           void                                     *user_data)
+{
+    microtouch3m_status_t st;
+    bool                  continue_loop = true;
+
+    if (libusb_kernel_driver_active (dev->usbhandle, 0)) {
+        microtouch3m_log ("kernel driver is active...");
+        if (libusb_detach_kernel_driver (dev->usbhandle, 0) == 0)
+            microtouch3m_log ("kernel driver now detached");
+    }
+
+    if (libusb_claim_interface (dev->usbhandle, 0) < 0)
+        return MICROTOUCH3M_STATUS_FAILED;
+
+    microtouch3m_log ("disable coordinate data reports...");
+    if ((st = run_out_request (dev,
+                               REQUEST_ASYNC_SET_REPORT,
+                               ASYNC_SET_REPORT_DISABLE,
+                               REPORT_ID_COORDINATE_DATA,
+                               NULL,
+                               0,
+                               NULL)) != MICROTOUCH3M_STATUS_OK) {
+        microtouch3m_log ("error: couldn't disable coordinate data reports");
+        return st;
+    }
+
+    microtouch3m_log ("disable scope data reports...");
+    if ((st = run_out_request (dev,
+                               REQUEST_ASYNC_SET_REPORT,
+                               ASYNC_SET_REPORT_DISABLE,
+                               REPORT_ID_SCOPE_DATA,
+                               NULL,
+                               0,
+                               NULL)) != MICROTOUCH3M_STATUS_OK) {
+        microtouch3m_log ("error: couldn't disable scope data reports");
+        return st;
+    }
+
+    microtouch3m_log ("reading current status...");
+    {
+        uint8_t buffer[20];
+
+        if ((st = run_in_request (dev,
+                                  REQUEST_STATUS,
+                                  0x0000,
+                                  0x0000,
+                                  buffer,
+                                  sizeof (buffer),
+                                  NULL)) != MICROTOUCH3M_STATUS_OK) {
+            microtouch3m_log ("error: couldn't read current status");
+            return st;
+        }
+    }
+
+    microtouch3m_log ("enable scope data reports...");
+    if ((st = run_out_request (dev,
+                               REQUEST_ASYNC_SET_REPORT,
+                               ASYNC_SET_REPORT_ENABLE,
+                               REPORT_ID_SCOPE_DATA,
+                               NULL,
+                               0,
+                               NULL)) != MICROTOUCH3M_STATUS_OK) {
+        microtouch3m_log ("error: couldn't enable scope data reports");
+        return st;
+    }
+
+    microtouch3m_log ("scope mode enabled");
+
+    while (continue_loop) {
+        /* Note: we want 35 bytes, but we can only read 32 max at the same time... */
+        struct report_scope_s report = { 0 };
+        int                   transferred = 0;
+        uint64_t              ul_signal;
+        uint64_t              ur_signal;
+        uint64_t              ll_signal;
+        uint64_t              lr_signal;
+
+        assert (sizeof (report) > MAX_INTERRUPT_ENDPOINT_TRANSFER);
+        if (libusb_interrupt_transfer (dev->usbhandle,
+                                       (LIBUSB_ENDPOINT_IN | 1),
+                                       (uint8_t *) &report,
+                                       MAX_INTERRUPT_ENDPOINT_TRANSFER,
+                                       &transferred,
+                                       5000) != 0) {
+            goto report_error;
+        }
+        if (transferred != MAX_INTERRUPT_ENDPOINT_TRANSFER)
+            goto report_error;
+        microtouch3m_log_buffer ("async report received", (uint8_t *) &report, transferred);
+
+        if (libusb_interrupt_transfer (dev->usbhandle,
+                                       (LIBUSB_ENDPOINT_IN | 1),
+                                       &(((uint8_t *) &report)[MAX_INTERRUPT_ENDPOINT_TRANSFER]),
+                                       sizeof (report) - MAX_INTERRUPT_ENDPOINT_TRANSFER,
+                                       &transferred,
+                                       5000) != 0) {
+            goto report_error;
+        }
+        if (transferred != sizeof (report) - MAX_INTERRUPT_ENDPOINT_TRANSFER)
+            goto report_error;
+        microtouch3m_log_buffer ("async report received", &(((uint8_t *) &report)[MAX_INTERRUPT_ENDPOINT_TRANSFER]), transferred);
+
+#if 0
+        microtouch3m_log ("UL(a): %d", le32toh (report.ul_a));
+        microtouch3m_log ("UL(b): %d", le32toh (report.ul_b));
+        microtouch3m_log ("UR(a): %d", le32toh (report.ur_a));
+        microtouch3m_log ("UR(b): %d", le32toh (report.ur_b));
+        microtouch3m_log ("LL(a): %d", le32toh (report.ll_a));
+        microtouch3m_log ("LL(b): %d", le32toh (report.ll_b));
+        microtouch3m_log ("LR(a): %d", le32toh (report.lr_a));
+        microtouch3m_log ("LR(b): %d", le32toh (report.lr_b));
+#endif
+
+        /* Note: explicitly convert to signed integer before converting to floating point!! */
+#define PROCESS(a,b) (uint64_t) sqrt ((((double)((int32_t)a)) * ((double)((int32_t)a))) + (((double)((int32_t)b)) * ((double)((int32_t)b))))
+
+        ul_signal = PROCESS (le32toh (report.ul_a), le32toh (report.ul_b));
+        ur_signal = PROCESS (le32toh (report.ur_a), le32toh (report.ur_b));
+        ll_signal = PROCESS (le32toh (report.ll_a), le32toh (report.ll_b));
+        lr_signal = PROCESS (le32toh (report.lr_a), le32toh (report.lr_b));
+
+        continue_loop = callback (dev,
+                                  MICROTOUCH3M_STATUS_OK,
+                                  ul_signal, ur_signal, ll_signal, lr_signal,
+                                  user_data);
+        continue;
+
+ report_error:
+        continue_loop = callback (dev,
+                                  MICROTOUCH3M_STATUS_FAILED,
+                                  0, 0, 0, 0,
+                                  user_data);
+    }
+
+    microtouch3m_log ("operation finished");
+
+    run_out_request (dev,
+                     REQUEST_ASYNC_SET_REPORT,
+                     ASYNC_SET_REPORT_DISABLE,
+                     REPORT_ID_SCOPE_DATA,
+                     NULL,
+                     0,
+                     NULL);
+
+    libusb_release_interface (dev->usbhandle, 0);
+
+    microtouch3m_log ("scope mode disabled");
     return MICROTOUCH3M_STATUS_OK;
 }
 

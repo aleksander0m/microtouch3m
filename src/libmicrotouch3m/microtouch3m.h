@@ -11,6 +11,7 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /******************************************************************************/
 /* Status */
@@ -288,6 +289,47 @@ const char *microtouch3m_device_reset_to_string (microtouch3m_device_reset_t res
  */
 microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *dev,
                                                  microtouch3m_device_reset_t  reset);
+
+/******************************************************************************/
+/* Device async report operation */
+
+/**
+ * microtouch3m_device_async_report_scope_f:
+ * @dev: a #microtouch3m_device_t.
+ * @status: status of the report.
+ * @ul_signal: signal level in the upper-left corner.
+ * @ur_signal: signal level in the upper-right corner.
+ * @ll_signal: signal level in the lower-left corner.
+ * @lr_signal: signal level in the lower-right corner.
+ * @user_data: user provided data when registering the callback.
+ *
+ * Callback operation registered when the user monitors async reports in scope mode.
+ *
+ * Returns: true if the monitoring should go on, false to stop it.
+ */
+typedef bool (microtouch3m_device_async_report_scope_f) (microtouch3m_device_t *dev,
+                                                         microtouch3m_status_t  status,
+                                                         uint64_t               ul_signal,
+                                                         uint64_t               ur_signal,
+                                                         uint64_t               ll_signal,
+                                                         uint64_t               lr_signal,
+                                                         void                  *user_data);
+
+/**
+ * microtouch3m_device_monitor_scope:
+ * @dev: a #microtouch3m_device_t.
+ * @callback: callback to be called for each received async report.
+ * @user_data: user provided data to be used when @callback is called.
+ *
+ * Performs an active monitoring of device generated async reports in scope mode.
+ * This method will only finish when @callback returns false.
+ *
+ * Note that this method will try to unbind the device interface from the kernel
+ * driver and take over control of it.
+ */
+microtouch3m_status_t microtouch3m_device_monitor_async_reports (microtouch3m_device_t                    *dev,
+                                                                 microtouch3m_device_async_report_scope_f *callback,
+                                                                 void                                     *user_data);
 
 /******************************************************************************/
 /* Device firmware operations */
