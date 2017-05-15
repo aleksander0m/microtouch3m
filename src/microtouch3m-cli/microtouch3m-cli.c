@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <inttypes.h>
 #include <math.h>
+#include <time.h>
 
 #include <common.h>
 
@@ -486,6 +487,26 @@ out:
 /******************************************************************************/
 /* ACTION: scope */
 
+struct async_report_scope_context_s {
+    uint64_t        n_records;
+    int             fd;
+    struct timespec start;
+};
+
+static void
+timespec_diff (struct timespec *start,
+               struct timespec *stop,
+               struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+}
+
 static bool
 async_report_scope (microtouch3m_device_t *dev,
                     microtouch3m_status_t  status,
@@ -499,10 +520,22 @@ async_report_scope (microtouch3m_device_t *dev,
                     int32_t                lr_q,
                     void                  *user_data)
 {
-    uint64_t ul_signal;
-    uint64_t ur_signal;
-    uint64_t ll_signal;
-    uint64_t lr_signal;
+    struct async_report_scope_context_s *context;
+    uint64_t                             ul_signal;
+    uint64_t                             ur_signal;
+    uint64_t                             ll_signal;
+    uint64_t                             lr_signal;
+    struct timespec                      current;
+    struct timespec                      difference;
+    uint64_t                             delta_ns;
+
+    context = (struct async_report_scope_context_s *) user_data;
+    context->n_records++;
+
+    /* Get current timer */
+    clock_gettime (CLOCK_MONOTONIC, &current);
+    timespec_diff (&context->start, &current, &difference);
+    delta_ns = (1000000000 * difference.tv_sec) + difference.tv_nsec;
 
 #define PROCESS(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
 
@@ -513,31 +546,68 @@ async_report_scope (microtouch3m_device_t *dev,
 
 #undef PROCESS
 
-    printf (CLEAR_LINE);
-    printf ("UL: %8" PRIu64 " | ", ul_signal);
-    printf ("UR: %8" PRIu64 " | ", ur_signal);
-    printf ("LL: %8" PRIu64 " | ", ll_signal);
-    printf ("LR: %8" PRIu64,      lr_signal);
-    fflush (stdout);
+    /* If no output file requested dump to stdout */
+    if (context->fd < 0) {
+        printf (CLEAR_LINE);
+        printf ("records: %" PRIu64 " | ", context->n_records);
+        printf ("delta: %"   PRIu64 " | ", delta_ns);
+        printf ("UL: %8"     PRIu64 " | ", ul_signal);
+        printf ("UR: %8"     PRIu64 " | ", ur_signal);
+        printf ("LL: %8"     PRIu64 " | ", ll_signal);
+        printf ("LR: %8"     PRIu64,       lr_signal);
+        fflush (stdout);
+    } else {
+        char buffer[512];
+        int  n_chars;
+
+        n_chars = snprintf (buffer, sizeof (buffer),
+                            "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
+                            delta_ns / 1E9, ul_signal, ur_signal, ll_signal, lr_signal);
+
+        if (write (context->fd, buffer, n_chars) < 0)
+            fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
+        else {
+            fsync (context->fd);
+            printf (CLEAR_LINE);
+            printf ("records: %" PRIu64, context->n_records);
+            fflush (stdout);
+        }
+    }
 
     return !stop_requested;
 }
 
 static int
 run_scope (microtouch3m_context_t *ctx,
+           const char             *out_file_path,
            bool                    first,
            uint8_t                 bus_number,
            uint8_t                 device_address)
 {
-    microtouch3m_device_t *dev;
-    microtouch3m_status_t  st;
-    int                    ret = EXIT_FAILURE;
+    microtouch3m_device_t               *dev;
+    microtouch3m_status_t                st;
+    int                                  ret = EXIT_FAILURE;
+    struct async_report_scope_context_s  context = {
+        .n_records = 0,
+        .fd = -1,
+    };
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
+    if (out_file_path) {
+        context.fd = open (out_file_path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (context.fd < 0) {
+            fprintf (stderr, "error: couldn't open output file to write: %s\n", strerror (errno));
+            goto out;
+        }
+    }
+
+    /* Start timer */
+    clock_gettime (CLOCK_MONOTONIC, &context.start);
+
     printf ("Scope mode:\n");
-    if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, NULL)) != MICROTOUCH3M_STATUS_OK) {
+    if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, &context)) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
@@ -547,6 +617,8 @@ run_scope (microtouch3m_context_t *ctx,
     ret = EXIT_SUCCESS;
 
 out:
+    if (!(context.fd < 0))
+        close (context.fd);
     if (dev)
         microtouch3m_device_unref (dev);
     return ret;
@@ -588,6 +660,7 @@ print_help (void)
             "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
             "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
             "  -S, --scope                        Run scope mode.\n"
+            "  -O, --scope-file=[PATH]            Run scope mode and store the results in an output file.\n"
             "\n"
             "Firmware actions:\n"
             "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
@@ -670,6 +743,7 @@ int main (int argc, char **argv)
     bool                    skip_removing_data_backup = false;
     char                   *restore_data_backup       = NULL;
     bool                    scope                     = false;
+    char                   *scope_file                = NULL;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
@@ -683,6 +757,7 @@ int main (int argc, char **argv)
         { "restore-data-backup",       required_argument, 0, 'B' },
         { "skip-removing-data-backup", no_argument,       0, 'N' },
         { "scope",                     no_argument,       0, 'S' },
+        { "scope-file",                required_argument, 0, 'O' },
         { "validate-fw-file",          required_argument, 0, 'z' },
         { "debug",                     no_argument,       0, 'd' },
         { "version",                   no_argument,       0, 'v' },
@@ -693,7 +768,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:NB:Sz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:z:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -719,6 +794,9 @@ int main (int argc, char **argv)
         case 'S':
             scope = true;
             break;
+        case 'O':
+            scope_file = strdup (optarg);
+            break;
         case 'z':
             validate_fw_file = strdup (optarg);
             break;
@@ -735,7 +813,7 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope;
+    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope + !!scope_file;
     n_actions = !!(validate_fw_file) + n_actions_require_device;
 
     if (n_actions > 1) {
@@ -790,14 +868,15 @@ int main (int argc, char **argv)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
-    else if (scope)
-        ret = run_scope (ctx, first, bus_number, device_address);
+    else if (scope || scope_file)
+        ret = run_scope (ctx, scope_file, first, bus_number, device_address);
     else
         assert (0);
 
 out:
     microtouch3m_context_unref (ctx);
 
+    free (scope_file);
     free (bus_number_device_address);
     free (firmware_dump);
     free (firmware_update);
