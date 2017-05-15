@@ -527,7 +527,7 @@ async_report_scope (microtouch3m_device_t *dev,
     uint64_t                             lr_signal;
     struct timespec                      current;
     struct timespec                      difference;
-    uint64_t                             delta_ns;
+    double                               delta_s;
 
     context = (struct async_report_scope_context_s *) user_data;
     context->n_records++;
@@ -535,7 +535,7 @@ async_report_scope (microtouch3m_device_t *dev,
     /* Get current timer */
     clock_gettime (CLOCK_MONOTONIC, &current);
     timespec_diff (&context->start, &current, &difference);
-    delta_ns = (1000000000 * difference.tv_sec) + difference.tv_nsec;
+    delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
 
 #define PROCESS(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
 
@@ -550,7 +550,7 @@ async_report_scope (microtouch3m_device_t *dev,
     if (context->fd < 0) {
         printf (CLEAR_LINE);
         printf ("records: %" PRIu64 " | ", context->n_records);
-        printf ("delta: %"   PRIu64 " | ", delta_ns);
+        printf ("delta: %lf | ", delta_s);
         printf ("UL: %8"     PRIu64 " | ", ul_signal);
         printf ("UR: %8"     PRIu64 " | ", ur_signal);
         printf ("LL: %8"     PRIu64 " | ", ll_signal);
@@ -562,7 +562,7 @@ async_report_scope (microtouch3m_device_t *dev,
 
         n_chars = snprintf (buffer, sizeof (buffer),
                             "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
-                            delta_ns / 1E9, ul_signal, ur_signal, ll_signal, lr_signal);
+                            delta_s, ul_signal, ur_signal, ll_signal, lr_signal);
 
         if (write (context->fd, buffer, n_chars) < 0)
             fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
