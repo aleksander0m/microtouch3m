@@ -297,10 +297,14 @@ microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *de
  * microtouch3m_device_async_report_scope_f:
  * @dev: a #microtouch3m_device_t.
  * @status: status of the report.
- * @ul_signal: signal level in the upper-left corner.
- * @ur_signal: signal level in the upper-right corner.
- * @ll_signal: signal level in the lower-left corner.
- * @lr_signal: signal level in the lower-right corner.
+ * @ul_i: I component of the upper-left (UL) corner.
+ * @ul_q: Q component of the upper-left (UL) corner.
+ * @ur_i: I component of the upper-right (UR) corner.
+ * @ur_q: Q component of the upper-rihgt (UR) corner.
+ * @ll_i: I component of the lower-left (LL) corner.
+ * @ll_q: Q component of the lower-left (LL) corner.
+ * @lr_i: I component of the lower-right (LR) corner.
+ * @lr_q: Q component of the lower-rihgt (LR) corner.
  * @user_data: user provided data when registering the callback.
  *
  * Callback operation registered when the user monitors async reports in scope mode.
@@ -309,10 +313,14 @@ microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *de
  */
 typedef bool (microtouch3m_device_async_report_scope_f) (microtouch3m_device_t *dev,
                                                          microtouch3m_status_t  status,
-                                                         uint64_t               ul_signal,
-                                                         uint64_t               ur_signal,
-                                                         uint64_t               ll_signal,
-                                                         uint64_t               lr_signal,
+                                                         int32_t                ul_i,
+                                                         int32_t                ul_q,
+                                                         int32_t                ur_i,
+                                                         int32_t                ur_q,
+                                                         int32_t                ll_i,
+                                                         int32_t                ll_q,
+                                                         int32_t                lr_i,
+                                                         int32_t                lr_q,
                                                          void                  *user_data);
 
 /**

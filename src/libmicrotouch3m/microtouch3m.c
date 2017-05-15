@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <endian.h>
 #include <libusb.h>
-#include <math.h>
 
 #include "common.h"
 
@@ -646,14 +645,14 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 struct report_scope_s {
     uint8_t  report_id;
     uint16_t wtf;
-    uint32_t ul_a;
-    uint32_t ul_b;
-    uint32_t ur_a;
-    uint32_t ur_b;
-    uint32_t ll_a;
-    uint32_t ll_b;
-    uint32_t lr_a;
-    uint32_t lr_b;
+    uint32_t ul_i;
+    uint32_t ul_q;
+    uint32_t ur_i;
+    uint32_t ur_q;
+    uint32_t ll_i;
+    uint32_t ll_q;
+    uint32_t lr_i;
+    uint32_t lr_q;
 } __attribute__((packed));
 
 microtouch3m_status_t
@@ -731,10 +730,10 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
         /* Note: we want 35 bytes, but we can only read 32 max at the same time... */
         struct report_scope_s report = { 0 };
         int                   transferred = 0;
-        uint64_t              ul_signal;
-        uint64_t              ur_signal;
-        uint64_t              ll_signal;
-        uint64_t              lr_signal;
+        int32_t               ul_i, ul_q;
+        int32_t               ur_i, ur_q;
+        int32_t               ll_i, ll_q;
+        int32_t               lr_i, lr_q;
 
         assert (sizeof (report) > MAX_INTERRUPT_ENDPOINT_TRANSFER);
         if (libusb_interrupt_transfer (dev->usbhandle,
@@ -761,35 +760,39 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
             goto report_error;
         microtouch3m_log_buffer ("async report received", &(((uint8_t *) &report)[MAX_INTERRUPT_ENDPOINT_TRANSFER]), transferred);
 
+        ul_i = (int32_t) (le32toh (report.ul_i));
+        ul_q = (int32_t) (le32toh (report.ul_q));
+        ur_i = (int32_t) (le32toh (report.ur_i));
+        ur_q = (int32_t) (le32toh (report.ur_q));
+        ll_i = (int32_t) (le32toh (report.ll_i));
+        ll_q = (int32_t) (le32toh (report.ll_q));
+        lr_i = (int32_t) (le32toh (report.lr_i));
+        lr_q = (int32_t) (le32toh (report.lr_q));
+
 #if 0
-        microtouch3m_log ("UL(a): %d", le32toh (report.ul_a));
-        microtouch3m_log ("UL(b): %d", le32toh (report.ul_b));
-        microtouch3m_log ("UR(a): %d", le32toh (report.ur_a));
-        microtouch3m_log ("UR(b): %d", le32toh (report.ur_b));
-        microtouch3m_log ("LL(a): %d", le32toh (report.ll_a));
-        microtouch3m_log ("LL(b): %d", le32toh (report.ll_b));
-        microtouch3m_log ("LR(a): %d", le32toh (report.lr_a));
-        microtouch3m_log ("LR(b): %d", le32toh (report.lr_b));
+        microtouch3m_log ("UL(I): %d", ul_i);
+        microtouch3m_log ("UL(Q): %d", ul_q);
+        microtouch3m_log ("UR(I): %d", ur_i);
+        microtouch3m_log ("UR(Q): %d", ur_q);
+        microtouch3m_log ("LL(I): %d", ll_i);
+        microtouch3m_log ("LL(Q): %d", ll_q);
+        microtouch3m_log ("LR(I): %d", lr_i);
+        microtouch3m_log ("LR(Q): %d", lr_q);
 #endif
-
-        /* Note: explicitly convert to signed integer before converting to floating point!! */
-#define PROCESS(a,b) (uint64_t) sqrt ((((double)((int32_t)a)) * ((double)((int32_t)a))) + (((double)((int32_t)b)) * ((double)((int32_t)b))))
-
-        ul_signal = PROCESS (le32toh (report.ul_a), le32toh (report.ul_b));
-        ur_signal = PROCESS (le32toh (report.ur_a), le32toh (report.ur_b));
-        ll_signal = PROCESS (le32toh (report.ll_a), le32toh (report.ll_b));
-        lr_signal = PROCESS (le32toh (report.lr_a), le32toh (report.lr_b));
 
         continue_loop = callback (dev,
                                   MICROTOUCH3M_STATUS_OK,
-                                  ul_signal, ur_signal, ll_signal, lr_signal,
+                                  ul_i, ul_q,
+                                  ur_i, ur_q,
+                                  ll_i, ll_q,
+                                  lr_i, lr_q,
                                   user_data);
         continue;
 
  report_error:
         continue_loop = callback (dev,
                                   MICROTOUCH3M_STATUS_FAILED,
-                                  0, 0, 0, 0,
+                                  0, 0, 0, 0, 0, 0, 0, 0,
                                   user_data);
     }
 

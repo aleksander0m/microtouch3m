@@ -13,7 +13,7 @@ microtouch3m_cli_CPPFLAGS = \
 	$(NULL)
 
 microtouch3m_cli_LDADD = \
-	-lpthread \
+	-lpthread -lm \
 	$(top_builddir)/src/common/libcommon.la \
 	$(top_builddir)/src/libmicrotouch3m/libmicrotouch3m.la \
 	$(NULL)

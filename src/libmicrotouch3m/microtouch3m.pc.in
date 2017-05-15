@@ -7,6 +7,5 @@ Name: microtouch3m
 Description: Library to work with the 3M MicroTouch Controllers
 Version: @VERSION@
 Requires.private: libusb-1.0
-Libs.private: -lm
 Libs: -L${libdir} -lmicrotouch3m
 Cflags: -I${includedir}/

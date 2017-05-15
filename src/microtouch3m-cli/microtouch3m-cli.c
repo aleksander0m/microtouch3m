@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include <common.h>
 
@@ -488,18 +489,37 @@ out:
 static bool
 async_report_scope (microtouch3m_device_t *dev,
                     microtouch3m_status_t  status,
-                    uint64_t               ul_signal,
-                    uint64_t               ur_signal,
-                    uint64_t               ll_signal,
-                    uint64_t               lr_signal,
+                    int32_t                ul_i,
+                    int32_t                ul_q,
+                    int32_t                ur_i,
+                    int32_t                ur_q,
+                    int32_t                ll_i,
+                    int32_t                ll_q,
+                    int32_t                lr_i,
+                    int32_t                lr_q,
                     void                  *user_data)
 {
+    uint64_t ul_signal;
+    uint64_t ur_signal;
+    uint64_t ll_signal;
+    uint64_t lr_signal;
+
+#define PROCESS(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
+
+    ul_signal = PROCESS (ul_i, ul_q);
+    ur_signal = PROCESS (ur_i, ur_q);
+    ll_signal = PROCESS (ll_i, ll_q);
+    lr_signal = PROCESS (lr_i, lr_q);
+
+#undef PROCESS
+
     printf (CLEAR_LINE);
     printf ("UL: %8" PRIu64 " | ", ul_signal);
     printf ("UR: %8" PRIu64 " | ", ur_signal);
     printf ("LL: %8" PRIu64 " | ", ll_signal);
     printf ("LR: %8" PRIu64,      lr_signal);
     fflush (stdout);
+
     return !stop_requested;
 }
 
