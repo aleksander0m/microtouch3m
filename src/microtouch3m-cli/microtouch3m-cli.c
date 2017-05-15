@@ -596,7 +596,7 @@ run_scope (microtouch3m_context_t *ctx,
         goto out;
 
     if (out_file_path) {
-        context.fd = open (out_file_path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        context.fd = open (out_file_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (context.fd < 0) {
             fprintf (stderr, "error: couldn't open output file to write: %s\n", strerror (errno));
             goto out;
