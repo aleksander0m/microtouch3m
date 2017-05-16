@@ -1014,7 +1014,8 @@ int main (int argc, char **argv)
         assert (0);
 
 out:
-    microtouch3m_context_unref (ctx);
+    if (ctx)
+        microtouch3m_context_unref (ctx);
 
     free (scope_file);
     free (bus_number_device_address);
