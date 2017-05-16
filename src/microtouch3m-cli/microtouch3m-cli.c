@@ -539,6 +539,7 @@ struct async_report_scope_context_s {
     uint64_t        n_records;
     int             fd;
     struct timespec start;
+    bool            scale_thousands;
 
     /* stray correction logic */
     bool            stray_correction;
@@ -611,12 +612,26 @@ async_report_scope (microtouch3m_device_t *dev,
     ll_signal = PROCESS_IQ (ll_i, ll_q);
     lr_signal = PROCESS_IQ (lr_i, lr_q);
 
+    if (context->scale_thousands) {
+        ul_signal /= 1000.0;
+        ur_signal /= 1000.0;
+        ll_signal /= 1000.0;
+        lr_signal /= 1000.0;
+    }
+
     /* Compute stray corrected signals */
     if (context->stray_correction) {
         ul_stray_signal = PROCESS_IQ (context->ul_stray_i, context->ul_stray_q);
         ur_stray_signal = PROCESS_IQ (context->ur_stray_i, context->ur_stray_q);
         ll_stray_signal = PROCESS_IQ (context->ll_stray_i, context->ll_stray_q);
         lr_stray_signal = PROCESS_IQ (context->lr_stray_i, context->lr_stray_q);
+
+        if (context->scale_thousands) {
+            ul_stray_signal /= 1000.0;
+            ur_stray_signal /= 1000.0;
+            ll_stray_signal /= 1000.0;
+            lr_stray_signal /= 1000.0;
+        }
 
         ul_corrected_signal = ((int64_t) ul_signal) - ((int64_t) ul_stray_signal);
         ur_corrected_signal = ((int64_t) ur_signal) - ((int64_t) ur_stray_signal);
@@ -685,6 +700,7 @@ static int
 run_scope (microtouch3m_context_t *ctx,
            const char             *out_file_path,
            bool                    stray_correction,
+           bool                    scale_thousands,
            bool                    first,
            uint8_t                 bus_number,
            uint8_t                 device_address)
@@ -694,6 +710,7 @@ run_scope (microtouch3m_context_t *ctx,
     int                                  ret = EXIT_FAILURE;
     struct async_report_scope_context_s  context = {
         .stray_correction = stray_correction,
+        .scale_thousands = scale_thousands,
         .n_records = 0,
         .fd = -1,
     };
@@ -800,6 +817,7 @@ print_help (void)
             "  -S, --scope                        Run scope mode.\n"
             "  -O, --scope-file=[PATH]            Store the scope results in an output file.\n"
             "  -C, --scope-stray-correction       Perform stray correction during the scope operation.\n"
+            "  -T, --scope-scale-thousands        Scale the values by 1000.\n"
             "\n"
             "Firmware file actions:\n"
             "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
@@ -884,6 +902,7 @@ int main (int argc, char **argv)
     bool                    scope                     = false;
     char                   *scope_file                = NULL;
     bool                    scope_stray_correction    = false;
+    bool                    scope_scale_thousands     = false;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
@@ -899,6 +918,7 @@ int main (int argc, char **argv)
         { "scope",                     no_argument,       0, 'S' },
         { "scope-file",                required_argument, 0, 'O' },
         { "scope-stray-correction",    no_argument,       0, 'C' },
+        { "scope-scale-thousands",     no_argument,       0, 'T' },
         { "validate-fw-file",          required_argument, 0, 'z' },
         { "debug",                     no_argument,       0, 'd' },
         { "version",                   no_argument,       0, 'v' },
@@ -909,7 +929,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:Cz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:CTz:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -941,6 +961,9 @@ int main (int argc, char **argv)
         case 'C':
             scope_stray_correction = true;
             break;
+        case 'T':
+            scope_scale_thousands = true;
+            break;
         case 'z':
             validate_fw_file = strdup (optarg);
             break;
@@ -967,6 +990,10 @@ int main (int argc, char **argv)
     }
     if (scope_stray_correction && !scope) {
         fprintf (stderr, "error: --scope-stray-correction can only be run with --scope\n");
+        goto out;
+    }
+    if (scope_scale_thousands && !scope) {
+        fprintf (stderr, "error: --scope-scale-thousands can only be run with --scope\n");
         goto out;
     }
 
@@ -1022,7 +1049,7 @@ int main (int argc, char **argv)
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
     else if (scope)
-        ret = run_scope (ctx, scope_file, scope_stray_correction, first, bus_number, device_address);
+        ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
     else
         assert (0);
 
