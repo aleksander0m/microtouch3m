@@ -789,7 +789,7 @@ print_help (void)
             "\n"
             "Scope device actions:\n"
             "  -S, --scope                        Run scope mode.\n"
-            "  -O, --scope-file=[PATH]            Run scope mode and store the results in an output file.\n"
+            "  -O, --scope-file=[PATH]            Store the scope results in an output file.\n"
             "  -C, --scope-stray-correction       Perform stray correction during the scope operation.\n"
             "\n"
             "Firmware file actions:\n"
@@ -947,8 +947,22 @@ int main (int argc, char **argv)
         }
     }
 
+    /* Error out on invalid combinations */
+    if (skip_removing_data_backup && !firmware_update) {
+        fprintf (stderr, "error: --skip-removing-data-backup can only be run with --firmware-update\n");
+        goto out;
+    }
+    if (scope_file && !scope) {
+        fprintf (stderr, "error: --scope-file can only be run with --scope\n");
+        goto out;
+    }
+    if (scope_stray_correction && !scope) {
+        fprintf (stderr, "error: --scope-stray-correction can only be run with --scope\n");
+        goto out;
+    }
+
     /* Track actions */
-    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope + !!scope_file;
+    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope;
     n_actions = !!(validate_fw_file) + n_actions_require_device;
 
     if (n_actions > 1) {
@@ -958,16 +972,6 @@ int main (int argc, char **argv)
     if (n_actions == 0) {
         fprintf (stderr, "error: no actions requested\n");
         return EXIT_FAILURE;
-    }
-
-    if (skip_removing_data_backup && !firmware_update) {
-        fprintf (stderr, "error: --skip-removing-data-backup can only be run with --firmware-update\n");
-        goto out;
-    }
-
-    if (scope_stray_correction && !scope && !scope_file) {
-        fprintf (stderr, "error: --scope-stray-correction can only be run with --scope or --scope-file\n");
-        goto out;
     }
 
     /* Setup library logging */
@@ -1008,7 +1012,7 @@ int main (int argc, char **argv)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
-    else if (scope || scope_file)
+    else if (scope)
         ret = run_scope (ctx, scope_file, scope_stray_correction, first, bus_number, device_address);
     else
         assert (0);
