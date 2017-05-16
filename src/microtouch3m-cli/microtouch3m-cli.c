@@ -596,7 +596,7 @@ async_report_scope (microtouch3m_device_t *dev,
     int64_t                              lr_corrected_signal = 0;
     struct timespec                      current;
     struct timespec                      difference;
-    double                               delta_s;
+    double                               time_s;
 
     context = (struct async_report_scope_context_s *) user_data;
     context->n_records++;
@@ -604,7 +604,7 @@ async_report_scope (microtouch3m_device_t *dev,
     /* Get current timer */
     clock_gettime (CLOCK_MONOTONIC, &current);
     timespec_diff (&context->start, &current, &difference);
-    delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+    time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
 
     /* Compute signals from I/Q components */
     ul_signal = PROCESS_IQ (ul_i, ul_q);
@@ -650,14 +650,14 @@ async_report_scope (microtouch3m_device_t *dev,
                                 "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
                                 "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
                                 "%8" PRId64 ", %8" PRId64 ", %8" PRId64 ", %8" PRId64 "\n",
-                                delta_s,
+                                time_s,
                                 ul_signal, ur_signal, ll_signal, lr_signal,
                                 ul_stray_signal, ur_stray_signal, ll_stray_signal, lr_stray_signal,
                                 ul_corrected_signal, ur_corrected_signal, ll_corrected_signal, lr_corrected_signal);
         } else {
             n_chars = snprintf (buffer, sizeof (buffer),
                                 "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
-                                delta_s, ul_signal, ur_signal, ll_signal, lr_signal);
+                                time_s, ul_signal, ur_signal, ll_signal, lr_signal);
         }
 
         if (write (context->fd, buffer, n_chars) < 0)
@@ -668,7 +668,7 @@ async_report_scope (microtouch3m_device_t *dev,
 
     printf (CLEAR_LINE);
     printf ("records: %" PRIu64 " | ", context->n_records);
-    printf ("delta: %lf | ", delta_s);
+    printf ("time: %lf | ", time_s);
     if (context->stray_correction) {
         printf ("UL(c): %8"     PRId64 " | ", ul_corrected_signal);
         printf ("UR(c): %8"     PRId64 " | ", ur_corrected_signal);
@@ -685,8 +685,8 @@ async_report_scope (microtouch3m_device_t *dev,
     /* stray update required? */
     if (context->stray_correction) {
         timespec_diff (&context->stray_timestamp, &current, &difference);
-        delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
-        if (delta_s > (STRAY_CORRECTION_TIMEOUT_MS / 1000.0))
+        time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+        if (time_s > (STRAY_CORRECTION_TIMEOUT_MS / 1000.0))
             return false;
     }
 
