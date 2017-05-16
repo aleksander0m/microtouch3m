@@ -678,6 +678,9 @@ async_report_scope (microtouch3m_device_t *dev,
     return !stop_requested;
 }
 
+static const char *basic_header_str  = "#   time,       UL,       UR,       LL,       LR\n";
+static const char *strays_header_str = "#   time,       UL,       UR,       LL,       LR,    UL(s),    UR(s),    LL(s),    LR(s),    UL(c),    UR(c),    LL(c),    LR(c)\n";
+
 static int
 run_scope (microtouch3m_context_t *ctx,
            const char             *out_file_path,
@@ -699,11 +702,19 @@ run_scope (microtouch3m_context_t *ctx,
         goto out;
 
     if (out_file_path) {
+        const char *header;
+
         context.fd = open (out_file_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (context.fd < 0) {
             fprintf (stderr, "error: couldn't open output file to write: %s\n", strerror (errno));
             goto out;
         }
+
+        header = (context.stray_correction ? strays_header_str :basic_header_str);
+        if (write (context.fd, header, strlen (header)) < 0)
+            fprintf (stderr, "error: couldn't write header to output file: %s\n", strerror (errno));
+        else
+            fsync (context.fd);
     }
 
     /* Start timer */
