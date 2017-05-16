@@ -34,6 +34,8 @@
 
 #define CLEAR_LINE "\33[2K\r"
 
+#define PROCESS_IQ(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
+
 /******************************************************************************/
 /* Signals */
 
@@ -149,41 +151,85 @@ run_info (microtouch3m_context_t *ctx,
 {
     microtouch3m_device_t *dev;
     microtouch3m_status_t  st;
-    uint16_t               controller_type;
-    uint8_t                firmware_major;
-    uint8_t                firmware_minor;
-    uint8_t                features;
-    uint16_t               constants_checksum;
-    uint16_t               max_param_write;
-    uint32_t               pc_checksum;
-    uint16_t               asic_type;
     int                    ret = EXIT_FAILURE;
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
-    if ((st = microtouch3m_device_query_controller_id (dev,
-                                                       &controller_type,
-                                                       &firmware_major,
-                                                       &firmware_minor,
-                                                       &features,
-                                                       &constants_checksum,
-                                                       &max_param_write,
-                                                       &pc_checksum,
-                                                       &asic_type)) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't query controller id: %s\n", microtouch3m_status_to_string (st));
-        goto out;
+    /* Controller ID */
+    {
+        uint16_t controller_type;
+        uint8_t  firmware_major;
+        uint8_t  firmware_minor;
+        uint8_t  features;
+        uint16_t constants_checksum;
+        uint16_t max_param_write;
+        uint32_t pc_checksum;
+        uint16_t asic_type;
+
+        if ((st = microtouch3m_device_query_controller_id (dev,
+                                                           &controller_type,
+                                                           &firmware_major,
+                                                           &firmware_minor,
+                                                           &features,
+                                                           &constants_checksum,
+                                                           &max_param_write,
+                                                           &pc_checksum,
+                                                           &asic_type)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't query controller id: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+
+        printf ("controller id:\n");
+        printf ("\treport id:          0x%02x\n", controller_type);
+        printf ("\tfirmware major:     0x%02x\n", firmware_major);
+        printf ("\tfirmware minor:     0x%02x\n", firmware_minor);
+        printf ("\tfeatures:           0x%02x\n", features);
+        printf ("\tconstants checksum: 0x%04x\n", constants_checksum);
+        printf ("\tmax param write:    0x%04x\n", max_param_write);
+        printf ("\tpc checksum:        0x%08x\n", pc_checksum);
+        printf ("\tasic type:          0x%04x\n", asic_type);
     }
 
-    printf ("controller id:\n");
-    printf ("\treport id:          0x%02x\n", controller_type);
-    printf ("\tfirmware major:     0x%02x\n", firmware_major);
-    printf ("\tfirmware minor:     0x%02x\n", firmware_minor);
-    printf ("\tfeatures:           0x%02x\n", features);
-    printf ("\tconstants checksum: 0x%04x\n", constants_checksum);
-    printf ("\tmax param write:    0x%04x\n", max_param_write);
-    printf ("\tpc checksum:        0x%08x\n", pc_checksum);
-    printf ("\tasic type:          0x%04x\n", asic_type);
+    /* Stray capacitances */
+    {
+        int32_t  ul_stray_i;
+        int32_t  ul_stray_q;
+        int32_t  ur_stray_i;
+        int32_t  ur_stray_q;
+        int32_t  ll_stray_i;
+        int32_t  ll_stray_q;
+        int32_t  lr_stray_i;
+        int32_t  lr_stray_q;
+        uint64_t ul_stray_signal;
+        uint64_t ur_stray_signal;
+        uint64_t ll_stray_signal;
+        uint64_t lr_stray_signal;
+
+        if ((st = microtouch3m_read_strays (dev,
+                                            &ul_stray_i,
+                                            &ul_stray_q,
+                                            &ur_stray_i,
+                                            &ur_stray_q,
+                                            &ll_stray_i,
+                                            &ll_stray_q,
+                                            &lr_stray_i,
+                                            &lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't read stray capacitances: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+
+        ul_stray_signal = PROCESS_IQ (ul_stray_i, ul_stray_q);
+        ur_stray_signal = PROCESS_IQ (ur_stray_i, ur_stray_q);
+        ll_stray_signal = PROCESS_IQ (ll_stray_i, ll_stray_q);
+        lr_stray_signal = PROCESS_IQ (lr_stray_i, lr_stray_q);
+
+        printf ("stray capacitances:\n");
+        printf ("\tUL: %8" PRIu64 "\n", ul_stray_signal);
+        printf ("\tUR: %8" PRIu64 "\n", ur_stray_signal);
+        printf ("\tLL: %8" PRIu64 "\n", ll_stray_signal);
+        printf ("\tLR: %8" PRIu64 "\n", lr_stray_signal);
+    }
 
     ret = EXIT_SUCCESS;
 
@@ -537,14 +583,10 @@ async_report_scope (microtouch3m_device_t *dev,
     timespec_diff (&context->start, &current, &difference);
     delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
 
-#define PROCESS(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
-
-    ul_signal = PROCESS (ul_i, ul_q);
-    ur_signal = PROCESS (ur_i, ur_q);
-    ll_signal = PROCESS (ll_i, ll_q);
-    lr_signal = PROCESS (lr_i, lr_q);
-
-#undef PROCESS
+    ul_signal = PROCESS_IQ (ul_i, ul_q);
+    ur_signal = PROCESS_IQ (ur_i, ur_q);
+    ll_signal = PROCESS_IQ (ll_i, ll_q);
+    lr_signal = PROCESS_IQ (lr_i, lr_q);
 
     /* If no output file requested dump to stdout */
     if (context->fd < 0) {
