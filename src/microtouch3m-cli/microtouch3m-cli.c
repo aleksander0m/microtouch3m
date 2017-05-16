@@ -822,7 +822,7 @@ print_help (void)
             "\n"
             "Firmware device actions:\n"
             "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
-            "  -u, --firmware-update=[PATH]       Update firmware in the device.\n"
+            "  -u, --firmware-update=[PATH]       Update firmware in the device (See Notes).\n"
             "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
             "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
             "\n"
@@ -841,6 +841,7 @@ print_help (void)
             "  -v, --version                      Show version.\n"
             "\n"
             "Notes:\n"
+            "  * The --firmware-update action will perform a controller reboot automatically.\n"
             "  * The --restore-data-backup may be given as an additional option to the --firmware-update\n"
             "    command, or alternatively as a command itself.\n"
             "\n");
