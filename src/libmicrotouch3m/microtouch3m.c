@@ -734,8 +734,10 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
             microtouch3m_log ("kernel driver now detached");
     }
 
-    if (libusb_claim_interface (dev->usbhandle, 0) < 0)
+    if (libusb_claim_interface (dev->usbhandle, 0) < 0) {
+        microtouch3m_log ("couldn't claim USB interface");
         return MICROTOUCH3M_STATUS_FAILED;
+    }
 
     microtouch3m_log ("disable coordinate data reports...");
     if ((st = run_out_request (dev,
