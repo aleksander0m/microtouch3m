@@ -397,6 +397,7 @@ enum request_e {
 
 enum parameter_id_e {
     PARAMETER_ID_CONTROLLER_NOVRAM = 0x0000,
+    PARAMETER_ID_CONTROLLER_STRAYS = 0x0003,
     PARAMETER_ID_CONTROLLER_EEPROM = 0x0020,
 };
 
@@ -634,6 +635,70 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 
     /* Success! */
     microtouch3m_log ("successfully requested controller reset");
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Read strays */
+
+struct parameter_report_read_strays_s {
+    struct parameter_report_s header;
+    uint32_t ul_stray_i;
+    uint32_t ul_stray_q;
+    uint32_t ur_stray_i;
+    uint32_t ur_stray_q;
+    uint32_t ll_stray_i;
+    uint32_t ll_stray_q;
+    uint32_t lr_stray_i;
+    uint32_t lr_stray_q;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_read_strays (microtouch3m_device_t *dev,
+                          int32_t               *ul_stray_i,
+                          int32_t               *ul_stray_q,
+                          int32_t               *ur_stray_i,
+                          int32_t               *ur_stray_q,
+                          int32_t               *ll_stray_i,
+                          int32_t               *ll_stray_q,
+                          int32_t               *lr_stray_i,
+                          int32_t               *lr_stray_q)
+{
+    microtouch3m_status_t                 st;
+    struct parameter_report_read_strays_s parameter_report;
+
+    microtouch3m_log ("reading strays");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_STRAYS,
+                                        0x0000,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    if (ul_stray_i)
+        *ul_stray_i = (int32_t) (le32toh (parameter_report.ul_stray_i));
+    if (ul_stray_q)
+        *ul_stray_q = (int32_t) (le32toh (parameter_report.ul_stray_q));
+
+    if (ur_stray_i)
+        *ur_stray_i = (int32_t) (le32toh (parameter_report.ur_stray_i));
+    if (ur_stray_q)
+        *ur_stray_q = (int32_t) (le32toh (parameter_report.ur_stray_q));
+
+    if (ll_stray_i)
+        *ll_stray_i = (int32_t) (le32toh (parameter_report.ll_stray_i));
+    if (ll_stray_q)
+        *ll_stray_q = (int32_t) (le32toh (parameter_report.ll_stray_q));
+
+    if (lr_stray_i)
+        *lr_stray_i = (int32_t) (le32toh (parameter_report.lr_stray_i));
+    if (lr_stray_q)
+        *lr_stray_q = (int32_t) (le32toh (parameter_report.lr_stray_q));
+
+    /* Success! */
+    microtouch3m_log ("successfully read strays");
     return MICROTOUCH3M_STATUS_OK;
 }
 

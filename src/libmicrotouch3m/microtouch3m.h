@@ -291,6 +291,35 @@ microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *de
                                                  microtouch3m_device_reset_t  reset);
 
 /******************************************************************************/
+/* Read strays */
+
+/**
+ * microtouch3m_device_read_strays:
+ * @dev: a #microtouch3m_device_t.
+ * @ul_stray_i: output location to store the I component of the upper-left (UL) corner.
+ * @ul_stray_q: output location to store the Q component of the upper-left (UL) corner.
+ * @ur_stray_i: output location to store the I component of the upper-right (UR) corner.
+ * @ur_stray_q: output location to store the Q component of the upper-rihgt (UR) corner.
+ * @ll_stray_i: output location to store the I component of the lower-left (LL) corner.
+ * @ll_stray_q: output location to store the Q component of the lower-left (LL) corner.
+ * @lr_stray_i: output location to store the I component of the lower-right (LR) corner.
+ * @lr_stray_q: output location to store the Q component of the lower-rihgt (LR) corner.
+ *
+ * Read stray capacitances from device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_read_strays (microtouch3m_device_t *dev,
+                                                int32_t               *ul_stray_i,
+                                                int32_t               *ul_stray_q,
+                                                int32_t               *ur_stray_i,
+                                                int32_t               *ur_stray_q,
+                                                int32_t               *ll_stray_i,
+                                                int32_t               *ll_stray_q,
+                                                int32_t               *lr_stray_i,
+                                                int32_t               *lr_stray_q);
+
+/******************************************************************************/
 /* Device async report operation */
 
 /**
