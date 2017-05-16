@@ -533,10 +533,24 @@ out:
 /******************************************************************************/
 /* ACTION: scope */
 
+#define STRAY_CORRECTION_TIMEOUT_MS 1000
+
 struct async_report_scope_context_s {
     uint64_t        n_records;
     int             fd;
     struct timespec start;
+
+    /* stray correction logic */
+    bool            stray_correction;
+    struct timespec stray_timestamp;
+    int32_t         ul_stray_i;
+    int32_t         ul_stray_q;
+    int32_t         ur_stray_i;
+    int32_t         ur_stray_q;
+    int32_t         ll_stray_i;
+    int32_t         ll_stray_q;
+    int32_t         lr_stray_i;
+    int32_t         lr_stray_q;
 };
 
 static void
@@ -571,6 +585,14 @@ async_report_scope (microtouch3m_device_t *dev,
     uint64_t                             ur_signal;
     uint64_t                             ll_signal;
     uint64_t                             lr_signal;
+    uint64_t                             ul_stray_signal;
+    uint64_t                             ur_stray_signal;
+    uint64_t                             ll_stray_signal;
+    uint64_t                             lr_stray_signal;
+    int64_t                              ul_corrected_signal;
+    int64_t                              ur_corrected_signal;
+    int64_t                              ll_corrected_signal;
+    int64_t                              lr_corrected_signal;
     struct timespec                      current;
     struct timespec                      difference;
     double                               delta_s;
@@ -588,23 +610,54 @@ async_report_scope (microtouch3m_device_t *dev,
     ll_signal = PROCESS_IQ (ll_i, ll_q);
     lr_signal = PROCESS_IQ (lr_i, lr_q);
 
+    if (context->stray_correction) {
+        ul_stray_signal = PROCESS_IQ (context->ul_stray_i, context->ul_stray_q);
+        ur_stray_signal = PROCESS_IQ (context->ur_stray_i, context->ur_stray_q);
+        ll_stray_signal = PROCESS_IQ (context->ll_stray_i, context->ll_stray_q);
+        lr_stray_signal = PROCESS_IQ (context->lr_stray_i, context->lr_stray_q);
+
+        ul_corrected_signal = ((int64_t) ul_signal) - ((int64_t) ul_stray_signal);
+        ur_corrected_signal = ((int64_t) ur_signal) - ((int64_t) ur_stray_signal);
+        ll_corrected_signal = ((int64_t) ll_signal) - ((int64_t) ll_stray_signal);
+        lr_corrected_signal = ((int64_t) lr_signal) - ((int64_t) lr_stray_signal);
+    }
+
     /* If no output file requested dump to stdout */
     if (context->fd < 0) {
         printf (CLEAR_LINE);
         printf ("records: %" PRIu64 " | ", context->n_records);
         printf ("delta: %lf | ", delta_s);
-        printf ("UL: %8"     PRIu64 " | ", ul_signal);
-        printf ("UR: %8"     PRIu64 " | ", ur_signal);
-        printf ("LL: %8"     PRIu64 " | ", ll_signal);
-        printf ("LR: %8"     PRIu64,       lr_signal);
+        if (context->stray_correction) {
+            printf ("UL: %8"     PRId64 " | ", ul_corrected_signal);
+            printf ("UR: %8"     PRId64 " | ", ur_corrected_signal);
+            printf ("LL: %8"     PRId64 " | ", ll_corrected_signal);
+            printf ("LR: %8"     PRId64,       lr_corrected_signal);
+        } else {
+            printf ("UL: %8"     PRIu64 " | ", ul_signal);
+            printf ("UR: %8"     PRIu64 " | ", ur_signal);
+            printf ("LL: %8"     PRIu64 " | ", ll_signal);
+            printf ("LR: %8"     PRIu64,       lr_signal);
+        }
         fflush (stdout);
     } else {
         char buffer[512];
         int  n_chars;
 
-        n_chars = snprintf (buffer, sizeof (buffer),
-                            "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
-                            delta_s, ul_signal, ur_signal, ll_signal, lr_signal);
+        if (context->stray_correction) {
+            n_chars = snprintf (buffer, sizeof (buffer),
+                                "%lf, "
+                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
+                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
+                                "%8" PRId64 ", %8" PRId64 ", %8" PRId64 ", %8" PRId64 "\n",
+                                delta_s,
+                                ul_signal, ur_signal, ll_signal, lr_signal,
+                                ul_stray_signal, ur_stray_signal, ll_stray_signal, lr_stray_signal,
+                                ul_corrected_signal, ur_corrected_signal, ll_corrected_signal, lr_corrected_signal);
+        } else {
+            n_chars = snprintf (buffer, sizeof (buffer),
+                                "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
+                                delta_s, ul_signal, ur_signal, ll_signal, lr_signal);
+        }
 
         if (write (context->fd, buffer, n_chars) < 0)
             fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
@@ -616,12 +669,21 @@ async_report_scope (microtouch3m_device_t *dev,
         }
     }
 
+    /* stray update required? */
+    if (context->stray_correction) {
+        timespec_diff (&context->stray_timestamp, &current, &difference);
+        delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+        if (delta_s > (STRAY_CORRECTION_TIMEOUT_MS / 1000.0))
+            return false;
+    }
+
     return !stop_requested;
 }
 
 static int
 run_scope (microtouch3m_context_t *ctx,
            const char             *out_file_path,
+           bool                    stray_correction,
            bool                    first,
            uint8_t                 bus_number,
            uint8_t                 device_address)
@@ -630,6 +692,7 @@ run_scope (microtouch3m_context_t *ctx,
     microtouch3m_status_t                st;
     int                                  ret = EXIT_FAILURE;
     struct async_report_scope_context_s  context = {
+        .stray_correction = stray_correction,
         .n_records = 0,
         .fd = -1,
     };
@@ -649,10 +712,30 @@ run_scope (microtouch3m_context_t *ctx,
     clock_gettime (CLOCK_MONOTONIC, &context.start);
 
     printf ("Scope mode:\n");
-    if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, &context)) != MICROTOUCH3M_STATUS_OK) {
-        fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
-        goto out;
+    while (!stop_requested) {
+        /* Update strays */
+        if (stray_correction) {
+            if ((st = microtouch3m_read_strays (dev,
+                                                &context.ul_stray_i,
+                                                &context.ul_stray_q,
+                                                &context.ur_stray_i,
+                                                &context.ur_stray_q,
+                                                &context.ll_stray_i,
+                                                &context.ll_stray_q,
+                                                &context.lr_stray_i,
+                                                &context.lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
+                fprintf (stderr, "error: couldn't read strays: %s\n", microtouch3m_status_to_string (st));
+                goto out;
+            }
+            clock_gettime (CLOCK_MONOTONIC, &context.stray_timestamp);
+        }
+
+        if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, &context)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
     }
+
     printf ("\n");
     printf ("Scope mode disabled\n");
 
@@ -707,6 +790,7 @@ print_help (void)
             "Scope device actions:\n"
             "  -S, --scope                        Run scope mode.\n"
             "  -O, --scope-file=[PATH]            Run scope mode and store the results in an output file.\n"
+            "  -C, --scope-stray-correction       Perform stray correction during the scope operation.\n"
             "\n"
             "Firmware file actions:\n"
             "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
@@ -790,6 +874,7 @@ int main (int argc, char **argv)
     char                   *restore_data_backup       = NULL;
     bool                    scope                     = false;
     char                   *scope_file                = NULL;
+    bool                    scope_stray_correction    = false;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
@@ -804,6 +889,7 @@ int main (int argc, char **argv)
         { "skip-removing-data-backup", no_argument,       0, 'N' },
         { "scope",                     no_argument,       0, 'S' },
         { "scope-file",                required_argument, 0, 'O' },
+        { "scope-stray-correction",    no_argument,       0, 'C' },
         { "validate-fw-file",          required_argument, 0, 'z' },
         { "debug",                     no_argument,       0, 'd' },
         { "version",                   no_argument,       0, 'v' },
@@ -814,7 +900,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:z:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:Cz:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -842,6 +928,9 @@ int main (int argc, char **argv)
             break;
         case 'O':
             scope_file = strdup (optarg);
+            break;
+        case 'C':
+            scope_stray_correction = true;
             break;
         case 'z':
             validate_fw_file = strdup (optarg);
@@ -873,6 +962,11 @@ int main (int argc, char **argv)
 
     if (skip_removing_data_backup && !firmware_update) {
         fprintf (stderr, "error: --skip-removing-data-backup can only be run with --firmware-update\n");
+        goto out;
+    }
+
+    if (scope_stray_correction && !scope && !scope_file) {
+        fprintf (stderr, "error: --scope-stray-correction can only be run with --scope or --scope-file\n");
         goto out;
     }
 
@@ -915,7 +1009,7 @@ int main (int argc, char **argv)
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
     else if (scope || scope_file)
-        ret = run_scope (ctx, scope_file, first, bus_number, device_address);
+        ret = run_scope (ctx, scope_file, scope_stray_correction, first, bus_number, device_address);
     else
         assert (0);
 
