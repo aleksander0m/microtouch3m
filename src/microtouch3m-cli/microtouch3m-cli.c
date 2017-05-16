@@ -605,11 +605,13 @@ async_report_scope (microtouch3m_device_t *dev,
     timespec_diff (&context->start, &current, &difference);
     delta_s = difference.tv_sec + (difference.tv_nsec / 1E9);
 
+    /* Compute signals from I/Q components */
     ul_signal = PROCESS_IQ (ul_i, ul_q);
     ur_signal = PROCESS_IQ (ur_i, ur_q);
     ll_signal = PROCESS_IQ (ll_i, ll_q);
     lr_signal = PROCESS_IQ (lr_i, lr_q);
 
+    /* Compute stray corrected signals */
     if (context->stray_correction) {
         ul_stray_signal = PROCESS_IQ (context->ul_stray_i, context->ul_stray_q);
         ur_stray_signal = PROCESS_IQ (context->ur_stray_i, context->ur_stray_q);
@@ -622,24 +624,8 @@ async_report_scope (microtouch3m_device_t *dev,
         lr_corrected_signal = ((int64_t) lr_signal) - ((int64_t) lr_stray_signal);
     }
 
-    /* If no output file requested dump to stdout */
-    if (context->fd < 0) {
-        printf (CLEAR_LINE);
-        printf ("records: %" PRIu64 " | ", context->n_records);
-        printf ("delta: %lf | ", delta_s);
-        if (context->stray_correction) {
-            printf ("UL: %8"     PRId64 " | ", ul_corrected_signal);
-            printf ("UR: %8"     PRId64 " | ", ur_corrected_signal);
-            printf ("LL: %8"     PRId64 " | ", ll_corrected_signal);
-            printf ("LR: %8"     PRId64,       lr_corrected_signal);
-        } else {
-            printf ("UL: %8"     PRIu64 " | ", ul_signal);
-            printf ("UR: %8"     PRIu64 " | ", ur_signal);
-            printf ("LL: %8"     PRIu64 " | ", ll_signal);
-            printf ("LR: %8"     PRIu64,       lr_signal);
-        }
-        fflush (stdout);
-    } else {
+    /* If output file requested, create record */
+    if (!(context->fd < 0)) {
         char buffer[512];
         int  n_chars;
 
@@ -661,13 +647,25 @@ async_report_scope (microtouch3m_device_t *dev,
 
         if (write (context->fd, buffer, n_chars) < 0)
             fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
-        else {
+        else
             fsync (context->fd);
-            printf (CLEAR_LINE);
-            printf ("records: %" PRIu64, context->n_records);
-            fflush (stdout);
-        }
     }
+
+    printf (CLEAR_LINE);
+    printf ("records: %" PRIu64 " | ", context->n_records);
+    printf ("delta: %lf | ", delta_s);
+    if (context->stray_correction) {
+        printf ("UL(c): %8"     PRId64 " | ", ul_corrected_signal);
+        printf ("UR(c): %8"     PRId64 " | ", ur_corrected_signal);
+        printf ("LL(c): %8"     PRId64 " | ", ll_corrected_signal);
+        printf ("LR(c): %8"     PRId64,       lr_corrected_signal);
+    } else {
+        printf ("UL: %8"     PRIu64 " | ", ul_signal);
+        printf ("UR: %8"     PRIu64 " | ", ur_signal);
+        printf ("LL: %8"     PRIu64 " | ", ll_signal);
+        printf ("LR: %8"     PRIu64,       lr_signal);
+    }
+    fflush (stdout);
 
     /* stray update required? */
     if (context->stray_correction) {
