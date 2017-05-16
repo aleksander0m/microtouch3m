@@ -107,6 +107,65 @@ create_device (microtouch3m_context_t *ctx,
 }
 
 /******************************************************************************/
+/* Helper: reboot device and wait for the new one */
+
+#define REBOOT_WAIT_CHECK_RETRIES      30
+#define REBOOT_WAIT_CHECK_TIMEOUT_SECS  2
+
+static microtouch3m_device_t *
+reboot_and_wait_device (microtouch3m_context_t *ctx,
+                        microtouch3m_device_t  *dev)
+{
+    microtouch3m_status_t st;
+    uint8_t               real_bus_number;
+    uint8_t               real_device_address;
+    uint8_t               port_numbers[MAX_PORT_NUMBERS];
+    int                   port_numbers_len;
+    int                   reboot_wait_check_retries;
+
+    /* The device will change address once rebooted, so we'll monitor that as
+     * well to make sure we don't try to use the device before it's rebooted. */
+    real_bus_number     = microtouch3m_device_get_usb_bus_number (dev);
+    real_device_address = microtouch3m_device_get_usb_device_address (dev);
+
+    /* Gather physical location of the device */
+    port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
+
+    printf ("rebooting controller...\n");
+    if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_REBOOT)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't reboot controller: %s\n", microtouch3m_status_to_string (st));
+        return NULL;
+    }
+
+    /* Forget about the device */
+    microtouch3m_device_unref (dev);
+    dev = NULL;
+
+    /* Sleep some time before looking for the new device (5s). This is a temporary hack until we know why
+     * the operation is failing on the iMX51 setup */
+    usleep (5000000);
+
+    /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
+     * deal as this operation isn't something you'd be doing often. */
+    for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
+        printf ("[%d/%d] waiting for controller reboot...\n", reboot_wait_check_retries + 1, REBOOT_WAIT_CHECK_RETRIES);
+        sleep (REBOOT_WAIT_CHECK_TIMEOUT_SECS);
+
+        dev = create_device (ctx, false, real_bus_number, 0, port_numbers, port_numbers_len);
+
+        /* No device found? */
+        if (!dev)
+            continue;
+        /* Device didn't reboot yet? */
+        if (real_device_address == microtouch3m_device_get_usb_device_address (dev))
+            continue;
+        break;
+    }
+
+    return dev;
+}
+
+/******************************************************************************/
 /* Helper: firmware progress reporting */
 
 static bool disable_progress;
@@ -253,6 +312,54 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: set sensitivity level */
+
+static int
+run_set_sensitivity_level (microtouch3m_context_t *ctx,
+                           bool                    first,
+                           uint8_t                 bus_number,
+                           uint8_t                 device_address,
+                           uint8_t                 level)
+{
+    microtouch3m_device_t *dev;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+    uint8_t                read_level;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_set_sensitivity_level (dev, level)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set sensitivity level: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    dev = reboot_and_wait_device (ctx, dev);
+    if (!dev) {
+        fprintf (stderr, "error: controller didn't reboot correctly\n");
+        goto out;
+    }
+
+    if ((st = microtouch3m_device_get_sensitivity_level (dev, &read_level)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't get sensitivity level after update: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    if (read_level != level) {
+        fprintf (stderr, "error: sensitivity level setting failed (requested %u, real %u)\n", level, read_level);
+        goto out;
+    }
+
+    printf ("successfully set sensitivity level to: %u\n", level);
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* ACTION: firmware dump */
 
 static int
@@ -294,9 +401,6 @@ out:
 
 /******************************************************************************/
 /* ACTION: firmware update */
-
-#define REBOOT_WAIT_CHECK_RETRIES      30
-#define REBOOT_WAIT_CHECK_TIMEOUT_SECS  2
 
 static char *
 save_device_data (const microtouch3m_device_data_t *dev_data,
@@ -394,16 +498,9 @@ run_firmware_update (microtouch3m_context_t *ctx,
     microtouch3m_device_t      *dev;
     char                       *dev_data_tmpfile = NULL;
     int                         ret = EXIT_FAILURE;
-    uint8_t                     real_bus_number;
-    uint8_t                     real_device_address;
-    uint8_t                     port_numbers[MAX_PORT_NUMBERS];
-    int                         port_numbers_len;
-    int                         reboot_wait_check_retries;
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
-
-    port_numbers_len = microtouch3m_device_get_usb_location (dev, port_numbers, MAX_PORT_NUMBERS);
 
     /* If a data backup given, read it instead of querying device */
     if (data_backup_path) {
@@ -459,42 +556,7 @@ run_firmware_update (microtouch3m_context_t *ctx,
         }
         printf ("\n");
 
-        /* The device will change address once rebooted, so we'll monitor that as
-         * well to make sure we don't try to use the device before it's rebooted. */
-        real_bus_number     = microtouch3m_device_get_usb_bus_number (dev);
-        real_device_address = microtouch3m_device_get_usb_device_address (dev);
-
-        printf ("rebooting controller...\n");
-        if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_REBOOT)) != MICROTOUCH3M_STATUS_OK) {
-            fprintf (stderr, "error: couldn't reboot controller: %s\n", microtouch3m_status_to_string (st));
-            goto out;
-        }
-
-        /* Forget about the device */
-        microtouch3m_device_unref (dev);
-        dev = NULL;
-
-	/* Sleep some time before looking for the new device (5s). This is a temporary hack until we know why
-	 * the operation is failing on the iMX51 setup */
-	usleep (5000000);
-
-        /* Note: using libusb to wait for the device asynchronously may be more efficient, but really not a big
-         * deal as this operation isn't something you'd be doing often. */
-        for (reboot_wait_check_retries = 0; reboot_wait_check_retries < REBOOT_WAIT_CHECK_RETRIES; reboot_wait_check_retries++) {
-            printf ("[%d/%d] waiting for controller reboot...\n", reboot_wait_check_retries + 1, REBOOT_WAIT_CHECK_RETRIES);
-            sleep (REBOOT_WAIT_CHECK_TIMEOUT_SECS);
-
-            dev = create_device (ctx, false, real_bus_number, 0, port_numbers, port_numbers_len);
-
-            /* No device found? */
-            if (!dev)
-                continue;
-            /* Device didn't reboot yet? */
-            if (real_device_address == microtouch3m_device_get_usb_device_address (dev))
-                continue;
-            break;
-        }
-
+        dev = reboot_and_wait_device (ctx, dev);
         if (!dev) {
             fprintf (stderr, "error: controller didn't reboot correctly\n");
             goto out;
@@ -819,6 +881,7 @@ print_help (void)
             "\n"
             "Common device actions:\n"
             "  -i, --info                         Show device information.\n"
+            "  -l, --set-sensitivity-level=[LVL]  Set sensitivity level (See Notes).\n"
             "\n"
             "Firmware device actions:\n"
             "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
@@ -844,6 +907,8 @@ print_help (void)
             "  * The --firmware-update action will perform a controller reboot automatically.\n"
             "  * The --restore-data-backup may be given as an additional option to the --firmware-update\n"
             "    command, or alternatively as a command itself.\n"
+            "  * The --set-sensitivity-level action will perform a controller reboot automatically.\n"
+            "  * The [LVL] value in --set-sensitivity-level may be any between 0 (min) and 6 (max).\n"
             "\n");
 }
 
@@ -909,6 +974,7 @@ int main (int argc, char **argv)
     uint8_t                 device_address            = 0;
     bool                    first                     = false;
     bool                    info                      = false;
+    char                   *set_sensitivity_level     = NULL;
     char                   *firmware_dump             = NULL;
     char                   *firmware_update           = NULL;
     bool                    skip_removing_data_backup = false;
@@ -925,6 +991,7 @@ int main (int argc, char **argv)
         { "bus-dev",                   required_argument, 0, 's' },
         { "first",                     no_argument,       0, 'f' },
         { "info",                      no_argument,       0, 'i' },
+        { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "firmware-dump",             required_argument, 0, 'x' },
         { "firmware-update",           required_argument, 0, 'u' },
         { "restore-data-backup",       required_argument, 0, 'B' },
@@ -943,7 +1010,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fix:u:NB:SO:CTz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "s:fil:x:u:NB:SO:CTz:dhv", longopts, &idx);
         switch (iarg) {
         case 's':
             bus_number_device_address = strdup (optarg);
@@ -953,6 +1020,9 @@ int main (int argc, char **argv)
             break;
         case 'i':
             info = true;
+            break;
+        case 'l':
+            set_sensitivity_level = strdup (optarg);
             break;
         case 'x':
             firmware_dump = strdup (optarg);
@@ -1012,8 +1082,16 @@ int main (int argc, char **argv)
     }
 
     /* Track actions */
-    n_actions_require_device = info + !!firmware_dump + !!(!!firmware_update + !!restore_data_backup) + scope;
-    n_actions = !!(validate_fw_file) + n_actions_require_device;
+    n_actions_require_device =
+        info +
+        !!set_sensitivity_level +
+        !!firmware_dump +
+        !!(!!firmware_update + !!restore_data_backup) +
+        scope;
+
+    n_actions =
+        !!(validate_fw_file) +
+        n_actions_require_device;
 
     if (n_actions > 1) {
         fprintf (stderr, "error: too many actions requested\n");
@@ -1058,7 +1136,17 @@ int main (int argc, char **argv)
         ret = run_validate_fw_file (validate_fw_file);
     else if (info)
         ret = run_info (ctx, first, bus_number, device_address);
-    else if (firmware_dump)
+    else if (set_sensitivity_level) {
+        long aux;
+
+        errno = 0;
+        aux = strtoul (set_sensitivity_level, NULL, 10);
+        if (errno || aux > MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX) {
+            fprintf (stderr, "error: invalid --set-sensitivity-level value given: %s\n", set_sensitivity_level);
+            goto out;
+        }
+        ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, (uint8_t) aux);
+    } else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
@@ -1077,5 +1165,6 @@ out:
     free (firmware_update);
     free (restore_data_backup);
     free (validate_fw_file);
+    free (set_sensitivity_level);
     return ret;
 }
