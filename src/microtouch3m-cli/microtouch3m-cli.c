@@ -231,6 +231,19 @@ run_info (microtouch3m_context_t *ctx,
         printf ("\tLR: %8" PRIu64 "\n", lr_stray_signal);
     }
 
+    /* Sensitivity level */
+    {
+        uint8_t level;
+
+        if ((st = microtouch3m_device_get_sensitivity_level (dev, &level)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get sensitivity level: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+
+        printf ("sensitivity\n");
+        printf ("\tlevel: %u\n", level);
+    }
+
     ret = EXIT_SUCCESS;
 
 out:
