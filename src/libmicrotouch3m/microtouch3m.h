@@ -291,6 +291,49 @@ microtouch3m_status_t microtouch3m_device_reset (microtouch3m_device_t       *de
                                                  microtouch3m_device_reset_t  reset);
 
 /******************************************************************************/
+/* Sensitivity levels */
+
+/**
+ * MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MIN:
+ *
+ * Minimum sensitivity level.
+ */
+#define MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MIN 0
+
+/**
+ * MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX:
+ *
+ * Maximum sensitivity level.
+ */
+#define MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX 6
+
+/**
+ * microtouch3m_device_get_sensitivity_level:
+ * @dev: a #microtouch3m_device_t.
+ * @level: output location to store the sensitivity level.
+ *
+ * Get the device sensitivity level.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_sensitivity_level (microtouch3m_device_t *dev,
+                                                                 uint8_t               *level);
+
+/**
+ * microtouch3m_device_set_sensitivity_level:
+ * @dev: a #microtouch3m_device_t.
+ * @level: output location to store the sensitivity level.
+ *
+ * Set the device sensitivity level.
+ *
+ * The controller must be rebooted after changing the sensitivity level.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_sensitivity_level (microtouch3m_device_t *dev,
+                                                                 uint8_t                level);
+
+/******************************************************************************/
 /* Read strays */
 
 /**

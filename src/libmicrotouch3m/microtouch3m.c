@@ -396,9 +396,10 @@ enum request_e {
 };
 
 enum parameter_id_e {
-    PARAMETER_ID_CONTROLLER_NOVRAM = 0x0000,
-    PARAMETER_ID_CONTROLLER_STRAYS = 0x0003,
-    PARAMETER_ID_CONTROLLER_EEPROM = 0x0020,
+    PARAMETER_ID_CONTROLLER_NOVRAM      = 0x0000,
+    PARAMETER_ID_CONTROLLER_STRAYS      = 0x0003,
+    PARAMETER_ID_CONTROLLER_SENSITIVITY = 0x0017,
+    PARAMETER_ID_CONTROLLER_EEPROM      = 0x0020,
 };
 
 enum report_id_e {
@@ -635,6 +636,92 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 
     /* Success! */
     microtouch3m_log ("successfully requested controller reset");
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Sensitivity levels */
+
+#define VALUE_SENSITIVITY 0x005a
+
+static const uint16_t level_ids[MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX + 1] = {
+    0xa401,
+    0x6501,
+    0x2601,
+    0xd200,
+    0x9300,
+    0x6900,
+    0x3f00
+};
+
+struct parameter_report_sensitivity_s {
+    struct parameter_report_s header;
+    uint16_t level;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_sensitivity_level (microtouch3m_device_t *dev,
+                                           uint8_t               *level)
+{
+    microtouch3m_status_t                 st;
+    struct parameter_report_sensitivity_s parameter_report;
+    int                                   i;
+    uint16_t                              level_id;
+
+    microtouch3m_log ("reading sensitivity");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SENSITIVITY,
+                                        VALUE_SENSITIVITY,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    level_id = le16toh (parameter_report.level);
+    for (i = MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MIN; i <= MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX; i++) {
+        if (level_id == level_ids[i]) {
+            if (level)
+                *level = i;
+            return MICROTOUCH3M_STATUS_OK;
+        }
+    }
+
+    microtouch3m_log ("invalid sensitivity level id (%hu)", level_id);
+    return MICROTOUCH3M_STATUS_INVALID_DATA;
+}
+
+struct sensitivity_s {
+    uint16_t level;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_set_sensitivity_level (microtouch3m_device_t *dev,
+                                           uint8_t                level)
+{
+    microtouch3m_status_t st;
+    struct sensitivity_s  sensitivity = { 0 };
+
+    if (level > MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX) {
+        microtouch3m_log ("invalid sensitivity level (%u > %u)", level, MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+
+    sensitivity.level = htole16 (level_ids[level]);
+
+    microtouch3m_log ("setting sensitivity level...");
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SENSITIVITY,
+                               VALUE_SENSITIVITY,
+                               (const uint8_t *) &sensitivity,
+                               sizeof (sensitivity),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log ("successfully set sensitivity level...");
     return MICROTOUCH3M_STATUS_OK;
 }
 
