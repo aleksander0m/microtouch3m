@@ -218,6 +218,46 @@ run_validate_fw_file (const char *path)
 /* ACTION: info */
 
 static int
+run_list (microtouch3m_context_t *ctx)
+{
+    microtouch3m_device_t **devs;
+    unsigned int            n_devs, i;
+    int                     ret = EXIT_FAILURE;
+
+    devs = microtouch3m_device_array_new (ctx, &n_devs);
+    if (!devs) {
+        printf ("no microtouch 3m devices found\n");
+        goto out;
+    }
+
+    for (i = 0; i < n_devs; i++) {
+        char    *location_str;
+        uint8_t  port_numbers[MAX_PORT_NUMBERS];
+        int      port_numbers_len;
+
+        port_numbers_len = microtouch3m_device_get_usb_location (devs[i], port_numbers, MAX_PORT_NUMBERS);
+        location_str = str_usb_location (microtouch3m_device_get_usb_bus_number (devs[i]), port_numbers, port_numbers_len);
+        printf ("microtouch 3m device found at:\n"
+                "\tbus number:     %u\n"
+                "\tdevice address: %u\n"
+                "\tlocation:       %s\n",
+                microtouch3m_device_get_usb_bus_number (devs[i]),
+                microtouch3m_device_get_usb_device_address (devs[i]),
+                location_str);
+        free (location_str);
+    }
+
+    ret = EXIT_SUCCESS;
+
+out:
+    microtouch3m_device_array_free (devs, n_devs);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: info */
+
+static int
 run_info (microtouch3m_context_t *ctx,
           bool                    first,
           uint8_t                 bus_number,
@@ -890,6 +930,9 @@ print_help (void)
     printf ("\n"
             "Usage: " PROGRAM_NAME " <option>\n"
             "\n"
+            "Device discovery options\n"
+            "  -n, --list                         List all devices found..\n"
+            "\n"
             "Generic device selection options\n"
             "  -s, --bus-dev=[BUS]:[DEV]          Select device by bus and/or device number.\n"
             "  -f, --first                        Select first device found.\n"
@@ -984,6 +1027,7 @@ int main (int argc, char **argv)
     unsigned int            n_actions_require_device;
     microtouch3m_context_t *ctx                       = NULL;
     int                     idx, iarg                 = 0;
+    bool                    list                      = false;
     char                   *bus_number_device_address = NULL;
     uint8_t                 bus_number                = 0;
     uint8_t                 device_address            = 0;
@@ -1003,6 +1047,7 @@ int main (int argc, char **argv)
     int                     ret                       = EXIT_FAILURE;
 
     const struct option longopts[] = {
+        { "list",                      no_argument,       0, 'n' },
         { "bus-dev",                   required_argument, 0, 's' },
         { "first",                     no_argument,       0, 'f' },
         { "info",                      no_argument,       0, 'i' },
@@ -1025,8 +1070,11 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "s:fil:x:u:NB:SO:CTz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fil:x:u:NB:SO:CTz:dhv", longopts, &idx);
         switch (iarg) {
+        case 'n':
+            list = true;
+            break;
         case 's':
             bus_number_device_address = strdup (optarg);
             break;
@@ -1105,6 +1153,7 @@ int main (int argc, char **argv)
         scope;
 
     n_actions =
+        list +
         !!(validate_fw_file) +
         n_actions_require_device;
 
@@ -1149,6 +1198,8 @@ int main (int argc, char **argv)
     /* Run actions */
     if (validate_fw_file)
         ret = run_validate_fw_file (validate_fw_file);
+    else if (list)
+        ret = run_list (ctx);
     else if (info)
         ret = run_info (ctx, first, bus_number, device_address);
     else if (set_sensitivity_level) {
