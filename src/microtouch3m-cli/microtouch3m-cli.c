@@ -568,7 +568,8 @@ run_firmware_update (microtouch3m_context_t *ctx,
 
         printf ("Are you sure you want to continue (y/N)? ");
         do {
-            scanf("%c", &ans);
+            if (scanf ("%c", &ans) <= 0)
+                continue;
         } while (ans != 'y' && ans != 'Y' && ans != 'n' && ans != 'N' && ans != '\r' && ans != '\n');
 
         if (ans != 'y' && ans != 'Y') {
