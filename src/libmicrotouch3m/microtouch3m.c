@@ -162,26 +162,29 @@ outerr:
 
 #define MAX_PORT_NUMBERS 7
 
-static libusb_device *
+static libusb_device **
 find_usb_device (microtouch3m_context_t *ctx,
+                 bool                    any,
                  bool                    first,
                  uint8_t                 bus_number,
                  uint8_t                 device_address,
                  const uint8_t          *port_numbers,
-                 int                     port_numbers_len)
+                 int                     port_numbers_len,
+                 unsigned int           *out_n_devices)
 {
-    libusb_device **list = NULL;
-    libusb_device  *found = NULL;
+    libusb_device **list  = NULL;
+    libusb_device **found = NULL;
+    unsigned int    n_found = 0;
     unsigned int    i;
     ssize_t         ret;
     char           *port_numbers_str = NULL;
 
     /* At least one search method requested */
-    assert ((device_address) || (port_numbers_len) || (first));
-    /* At maximum on search method requested */
-    assert ((!!device_address + !!port_numbers_len + !!first) == 1);
-    /* bus number requested unless first */
-    assert (bus_number || first);
+    assert ((device_address) || (port_numbers_len) || (first) || (any));
+    /* At maximum one search method requested */
+    assert ((!!device_address + !!port_numbers_len + first + any) == 1);
+    /* bus number requested unless first or any */
+    assert (bus_number || first || any);
 
     if ((ret = libusb_get_device_list (ctx->usb, &list)) < 0) {
         microtouch3m_log ("error: couldn't list USB devices: %s", libusb_strerror (ret));
@@ -195,9 +198,10 @@ find_usb_device (microtouch3m_context_t *ctx,
     }
 
     assert (list);
-    for (i = 0; !found && list[i]; i++) {
-        libusb_device                   *iter;
-        struct libusb_device_descriptor  desc;
+    for (i = 0; list[i]; i++) {
+        libusb_device                    *iter;
+        struct libusb_device_descriptor   desc;
+        libusb_device                   **aux;
 
         iter = list[i];
 
@@ -260,8 +264,16 @@ find_usb_device (microtouch3m_context_t *ctx,
                 continue;
         }
 
-        found = libusb_ref_device (iter);
-        microtouch3m_log ("found requested MicroTouch 3M device");
+        aux = realloc (found, (n_found + 1) * sizeof (libusb_device *));
+        if (!aux) {
+            microtouch3m_log ("error reallocating array of devices");
+            continue;
+        }
+        found = aux;
+        found[n_found++] = libusb_ref_device (iter);
+
+        if (!any)
+            break;
     }
 
     free (port_numbers_str);
@@ -270,7 +282,105 @@ find_usb_device (microtouch3m_context_t *ctx,
     if (!found)
         microtouch3m_log ("error: couldn't find MicroTouch 3M device");
 
+    *out_n_devices = n_found;
+
     return found;
+}
+
+/* Note: don't use libusb_free_device_list () as WE created this array */
+static void
+usb_device_array_free (libusb_device **array,
+                       unsigned int    n_items)
+{
+    unsigned int i;
+
+    if (!array || !n_items)
+        return;
+
+    for (i = 0; i < n_items; i++) {
+        if (array[i])
+            libusb_unref_device (array[i]);
+    }
+    free (array);
+}
+
+static libusb_device *
+find_one_usb_device (microtouch3m_context_t *ctx,
+                     bool                    first,
+                     uint8_t                 bus_number,
+                     uint8_t                 device_address,
+                     const uint8_t          *port_numbers,
+                     int                     port_numbers_len)
+{
+    libusb_device  *usbdev = NULL;
+    libusb_device **usbdevs;
+    unsigned int    n_devices;
+
+    usbdevs = find_usb_device (ctx, false, first, bus_number, device_address, port_numbers, port_numbers_len, &n_devices);
+    if (!usbdevs || !n_devices)
+        return NULL;
+
+    assert (n_devices == 1);
+
+    usbdev = libusb_ref_device (usbdevs[0]);
+
+    usb_device_array_free (usbdevs, n_devices);
+
+    return usbdev;
+}
+
+void
+microtouch3m_device_array_free (microtouch3m_device_t **array,
+                                unsigned int            n_items)
+{
+    unsigned int i;
+
+    if (!array || !n_items)
+        return;
+
+    for (i = 0; i < n_items; i++) {
+        if (array[i])
+            microtouch3m_device_unref (array[i]);
+    }
+    free (array);
+}
+
+microtouch3m_device_t **
+microtouch3m_device_array_new (microtouch3m_context_t *ctx,
+                               unsigned int           *out_n_items)
+{
+    microtouch3m_device_t **devices;
+    libusb_device         **usbdevs;
+    unsigned int            n_devices;
+    unsigned int            i;
+
+    assert (out_n_items);
+
+    usbdevs = find_usb_device (ctx, true, false, 0, 0, NULL, 0, &n_devices);
+    if (!usbdevs || !n_devices)
+        goto out_err;
+
+    devices = calloc (n_devices, sizeof (microtouch3m_device_t *));
+    if (!devices)
+        goto out_err;
+
+    for (i = 0; i < n_devices; i++) {
+        /* On device creation failure, usbdev is consumed as well */
+        devices[i] = device_new_by_usbdev (ctx, libusb_ref_device (usbdevs[i]));
+        /* Any error creating a device makes the whole process fail */
+        if (!devices[i])
+            goto out_err;
+    }
+    usb_device_array_free (usbdevs, n_devices);
+
+    *out_n_items = n_devices;
+    return devices;
+
+out_err:
+    microtouch3m_device_array_free (devices, n_devices);
+    usb_device_array_free (usbdevs, n_devices);
+    *out_n_items = 0;
+    return NULL;
 }
 
 microtouch3m_device_t *
@@ -278,7 +388,7 @@ microtouch3m_device_new_first (microtouch3m_context_t *ctx)
 {
     libusb_device *usbdev;
 
-    usbdev = find_usb_device (ctx, true, 0, 0, NULL, 0);
+    usbdev = find_one_usb_device (ctx, true, 0, 0, NULL, 0);
     if (!usbdev)
         return NULL;
 
@@ -293,7 +403,7 @@ microtouch3m_device_new_by_usb_address (microtouch3m_context_t *ctx,
 {
     libusb_device *usbdev;
 
-    usbdev = find_usb_device (ctx, false, bus_number, device_address, NULL, 0);
+    usbdev = find_one_usb_device (ctx, false, bus_number, device_address, NULL, 0);
     if (!usbdev)
         return NULL;
 
@@ -309,7 +419,7 @@ microtouch3m_device_new_by_usb_location (microtouch3m_context_t *ctx,
 {
     libusb_device *usbdev;
 
-    usbdev = find_usb_device (ctx, false, bus_number, 0, port_numbers, port_numbers_len);
+    usbdev = find_one_usb_device (ctx, false, bus_number, 0, port_numbers, port_numbers_len);
     if (!usbdev)
         return NULL;
 

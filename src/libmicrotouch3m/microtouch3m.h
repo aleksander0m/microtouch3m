@@ -117,6 +117,37 @@ void microtouch3m_context_unref (microtouch3m_context_t *ctx);
 typedef struct microtouch3m_device_s microtouch3m_device_t;
 
 /**
+ * microtouch3m_device_array_new:
+ * @ctx: a #microtouch3m_context_t.
+ * @out_n_items: output location to store the number of items in the returned array.
+ *
+ * Creates a new #microtouch3m_device_t for each MicroTouch 3M device found in
+ * the system, and returns them in an array.
+ *
+ * The array holds one reference for each #microtouch3m_device_t. If you want to
+ * keep a reference of your own, just microtouch3m_device_ref() the desired
+ * instance.
+ *
+ * When no longer needed, the returned array should be disposed with
+ * microtouch_device_array_free().
+ *
+ * Returns: a newly allocated array of #microtouch3m_device_t instances.
+ */
+microtouch3m_device_t **microtouch3m_device_array_new (microtouch3m_context_t *ctx,
+                                                       unsigned int           *out_n_items);
+
+/**
+ * microtouch3m_device_array_free:
+ * @array: an array of #microtouch3m_device_t instances.
+ * @n_items: number of instances in @array.
+ *
+ * Frees an array of #microtouch3m_device_t instances created with
+ * microtouch_device_array_new().
+ */
+void microtouch3m_device_array_free (microtouch3m_device_t **array,
+                                     unsigned int            n_items);
+
+/**
  * microtouch3m_device_new_first:
  * @ctx: a #microtouch3m_context_t.
  *
