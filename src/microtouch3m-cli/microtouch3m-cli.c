@@ -608,7 +608,7 @@ out:
 /******************************************************************************/
 /* ACTION: scope */
 
-#define STRAY_CORRECTION_TIMEOUT_MS 1000
+#define STRAY_CORRECTION_TIMEOUT_MS 500
 
 struct async_report_scope_context_s {
     uint64_t        n_records;
