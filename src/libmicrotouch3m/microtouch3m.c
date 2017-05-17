@@ -349,9 +349,9 @@ microtouch3m_device_t **
 microtouch3m_device_array_new (microtouch3m_context_t *ctx,
                                unsigned int           *out_n_items)
 {
-    microtouch3m_device_t **devices;
-    libusb_device         **usbdevs;
-    unsigned int            n_devices;
+    microtouch3m_device_t **devices = NULL;
+    libusb_device         **usbdevs = NULL;
+    unsigned int            n_devices = 0;
     unsigned int            i;
 
     assert (out_n_items);
