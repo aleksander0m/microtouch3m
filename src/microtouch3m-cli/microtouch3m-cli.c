@@ -1,9 +1,24 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
- * Copyright (C) 2016 Zodiac Inflight Innovations
- * All rights reserved.
+ * microtouch3m-cli - Command line tool to control MicroTouch 3M touchscreens
  *
- * Author: Aleksander Morgado <aleksander@aleksander.es>
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301 USA.
+ *
+ * Copyright (C) 2017 Zodiac Inflight Innovations
+ * Copyright (C) 2017 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -608,7 +623,7 @@ out:
 /******************************************************************************/
 /* ACTION: scope */
 
-#define STRAY_CORRECTION_TIMEOUT_MS 500
+#define STRAY_CORRECTION_TIMEOUT_MS 100
 
 struct async_report_scope_context_s {
     uint64_t        n_records;
