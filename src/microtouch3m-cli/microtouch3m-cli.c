@@ -557,6 +557,27 @@ run_firmware_update (microtouch3m_context_t *ctx,
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
+    /* Ask the user for confirmation */
+    if (path) {
+        char ans;
+
+        printf ("-------------------------------------------------------------\n");
+        printf ("You are going to upgrade firmware to controller at %u:%u\n",
+                microtouch3m_device_get_usb_bus_number (dev),
+                microtouch3m_device_get_usb_device_address (dev));
+
+        printf ("Are you sure you want to continue (y/N)? ");
+        do {
+            scanf("%c", &ans);
+        } while (ans != 'y' && ans != 'Y' && ans != 'n' && ans != 'N' && ans != '\r' && ans != '\n');
+
+        if (ans != 'y' && ans != 'Y') {
+            printf (" -- aborted --\n");
+            goto out;
+        }
+        printf ("-------------------------------------------------------------\n");
+    }
+
     /* If a data backup given, read it instead of querying device */
     if (data_backup_path) {
         size_t loaded_dev_data_size = 0;
