@@ -380,6 +380,63 @@ microtouch3m_status_t microtouch3m_device_set_sensitivity_level (microtouch3m_de
                                                                  uint8_t                level);
 
 /******************************************************************************/
+/* Frequencies */
+
+/**
+ * microtouch3m_device_frequency_t:
+ * @MICROTOUCH3M_DEVICE_FREQUENCY_109096: 109.096 Hz
+ * @MICROTOUCH3M_DEVICE_FREQUENCY_95703: 95.703 Hz
+ * @MICROTOUCH3M_DEVICE_FREQUENCY_85286: 85.286 Hz
+ * @MICROTOUCH3M_DEVICE_FREQUENCY_76953: 76.953 Hz
+ * @MICROTOUCH3M_DEVICE_FREQUENCY_70135: 70.135 Hz
+ *
+ * Supported device frequencies.
+ */
+typedef enum {
+    MICROTOUCH3M_DEVICE_FREQUENCY_109096 = 0x001b,
+    MICROTOUCH3M_DEVICE_FREQUENCY_95703  = 0x001f,
+    MICROTOUCH3M_DEVICE_FREQUENCY_85286  = 0x0023,
+    MICROTOUCH3M_DEVICE_FREQUENCY_76953  = 0x0027,
+    MICROTOUCH3M_DEVICE_FREQUENCY_70135  = 0x002b,
+} microtouch3m_device_frequency_t;
+
+/**
+ * microtouch3m_device_frequency_to_string:
+ * @freq: a #microtouch3m_device_frequency_t.
+ *
+ * Gets a description for the given #microtouch3m_device_frequency_t.
+ *
+ * Returns: a constant string.
+ */
+const char *microtouch3m_device_frequency_to_string (microtouch3m_device_frequency_t freq);
+
+/**
+ * microtouch3m_device_get_frequency:
+ * @dev: a #microtouch3m_device_t.
+ * @freq: output location to store the frequency.
+ *
+ * Get the currently configured frequency in the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_frequency (microtouch3m_device_t           *dev,
+                                                         microtouch3m_device_frequency_t *freq);
+
+/**
+ * microtouch3m_device_set_frequency:
+ * @dev: a #microtouch3m_device_t.
+ * @freq: the requested frequency.
+ *
+ * Set the device frequency.
+ *
+ * The controller must be soft-reseted after changing the frequency.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_frequency (microtouch3m_device_t           *dev,
+                                                         microtouch3m_device_frequency_t  freq);
+
+/******************************************************************************/
 /* Read strays */
 
 /**
