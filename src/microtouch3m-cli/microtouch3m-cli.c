@@ -271,7 +271,8 @@ run_info (microtouch3m_context_t *ctx,
         goto out;
 
     /* Controller ID */
-    {
+    printf ("controller id:\n");
+    do {
         uint16_t controller_type;
         uint8_t  firmware_major;
         uint8_t  firmware_minor;
@@ -291,10 +292,9 @@ run_info (microtouch3m_context_t *ctx,
                                                            &pc_checksum,
                                                            &asic_type)) != MICROTOUCH3M_STATUS_OK) {
             fprintf (stderr, "error: couldn't query controller id: %s\n", microtouch3m_status_to_string (st));
-            goto out;
+            break;
         }
 
-        printf ("controller id:\n");
         printf ("\treport id:          0x%02x\n", controller_type);
         printf ("\tfirmware major:     0x%02x\n", firmware_major);
         printf ("\tfirmware minor:     0x%02x\n", firmware_minor);
@@ -303,10 +303,11 @@ run_info (microtouch3m_context_t *ctx,
         printf ("\tmax param write:    0x%04x\n", max_param_write);
         printf ("\tpc checksum:        0x%08x\n", pc_checksum);
         printf ("\tasic type:          0x%04x\n", asic_type);
-    }
+    } while (0);
 
     /* Stray capacitances */
-    {
+    printf ("stray capacitances:\n");
+    do {
         int32_t  ul_stray_i;
         int32_t  ul_stray_q;
         int32_t  ur_stray_i;
@@ -330,7 +331,7 @@ run_info (microtouch3m_context_t *ctx,
                                             &lr_stray_i,
                                             &lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
             fprintf (stderr, "error: couldn't read stray capacitances: %s\n", microtouch3m_status_to_string (st));
-            goto out;
+            break;
         }
 
         ul_stray_signal = PROCESS_IQ (ul_stray_i, ul_stray_q);
@@ -338,25 +339,38 @@ run_info (microtouch3m_context_t *ctx,
         ll_stray_signal = PROCESS_IQ (ll_stray_i, ll_stray_q);
         lr_stray_signal = PROCESS_IQ (lr_stray_i, lr_stray_q);
 
-        printf ("stray capacitances:\n");
         printf ("\tUL: %8" PRIu64 "\n", ul_stray_signal);
         printf ("\tUR: %8" PRIu64 "\n", ur_stray_signal);
         printf ("\tLL: %8" PRIu64 "\n", ll_stray_signal);
         printf ("\tLR: %8" PRIu64 "\n", lr_stray_signal);
-    }
+    } while (0);
+
+    /* Now several settings */
+    printf ("settings:\n");
 
     /* Sensitivity level */
-    {
+    do {
         uint8_t level;
 
         if ((st = microtouch3m_device_get_sensitivity_level (dev, &level)) != MICROTOUCH3M_STATUS_OK) {
             fprintf (stderr, "error: couldn't get sensitivity level: %s\n", microtouch3m_status_to_string (st));
-            goto out;
+            break;
         }
 
-        printf ("sensitivity\n");
-        printf ("\tlevel: %u\n", level);
-    }
+        printf ("\tsensitivity level: %u\n", level);
+    } while (0);
+
+    /* Frequency */
+    do {
+        microtouch3m_device_frequency_t freq;
+
+        if ((st = microtouch3m_device_get_frequency (dev, &freq)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get frequency: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+
+        printf ("\tfrequency:         %s\n", microtouch3m_device_frequency_to_string (freq));
+    } while (0);
 
     ret = EXIT_SUCCESS;
 
