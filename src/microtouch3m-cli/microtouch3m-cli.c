@@ -429,6 +429,79 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: set frequency */
+
+typedef struct {
+    unsigned long value;
+    microtouch3m_device_frequency_t id;
+} freq_id_s;
+
+static const freq_id_s freq_id[] = {
+    { .value = 109096, .id = MICROTOUCH3M_DEVICE_FREQUENCY_109096 },
+    { .value =  95703, .id = MICROTOUCH3M_DEVICE_FREQUENCY_95703  },
+    { .value =  85286, .id = MICROTOUCH3M_DEVICE_FREQUENCY_85286  },
+    { .value =  76953, .id = MICROTOUCH3M_DEVICE_FREQUENCY_76953  },
+    { .value =  70135, .id = MICROTOUCH3M_DEVICE_FREQUENCY_70135  },
+};
+
+static int
+run_set_frequency (microtouch3m_context_t *ctx,
+                   bool                    first,
+                   uint8_t                 bus_number,
+                   uint8_t                 device_address,
+                   unsigned long           frequency)
+{
+    microtouch3m_device_t           *dev;
+    microtouch3m_status_t            st;
+    int                              ret = EXIT_FAILURE;
+    int                              i;
+    microtouch3m_device_frequency_t  read_id;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    for (i = 0; i < (sizeof (freq_id) / sizeof (freq_id[0])); i++) {
+        if (freq_id[i].value == frequency)
+            break;
+    }
+
+    if (i == (sizeof (freq_id) / sizeof (freq_id[0]))) {
+        fprintf (stderr, "error: unknown frequency preset requested: %lumHz\n", frequency);
+        goto out;
+    }
+
+    if ((st = microtouch3m_device_set_frequency (dev, freq_id[i].id)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set frequency: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_SOFT)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't soft reset controller: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    if ((st = microtouch3m_device_get_frequency (dev, &read_id)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't get frequency after update: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    if (read_id != freq_id[i].id) {
+        fprintf (stderr, "error: frequency setting failed (requested %s, real %s)\n",
+                 microtouch3m_device_frequency_to_string (freq_id[i].id),
+                 microtouch3m_device_frequency_to_string (read_id));
+        goto out;
+    }
+
+    printf ("successfully set frequency to: %s\n", microtouch3m_device_frequency_to_string (freq_id[i].id));
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* ACTION: firmware dump */
 
 static int
@@ -976,6 +1049,7 @@ print_help (void)
             "Common device actions:\n"
             "  -i, --info                         Show device information.\n"
             "  -l, --set-sensitivity-level=[LVL]  Set sensitivity level (See Notes).\n"
+            "  -r, --set-frequency=[FREQ]         Set frequency (See Notes).\n"
             "\n"
             "Firmware device actions:\n"
             "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
@@ -1001,8 +1075,12 @@ print_help (void)
             "  * The --firmware-update action will perform a controller reboot automatically.\n"
             "  * The --restore-data-backup may be given as an additional option to the --firmware-update\n"
             "    command, or alternatively as a command itself.\n"
+            "\n"
             "  * The --set-sensitivity-level action will perform a controller reboot automatically.\n"
             "  * The [LVL] value in --set-sensitivity-level may be any between 0 (min) and 6 (max).\n"
+            "\n"
+            "  * The [FREQ] value in --set-frequency is given in mHz, and may be any of:\n"
+            "    70135, 76953, 85285, 95703, 109096\n"
             "\n");
 }
 
@@ -1070,6 +1148,7 @@ int main (int argc, char **argv)
     bool                    first                     = false;
     bool                    info                      = false;
     char                   *set_sensitivity_level     = NULL;
+    char                   *set_frequency             = NULL;
     char                   *firmware_dump             = NULL;
     char                   *firmware_update           = NULL;
     bool                    skip_removing_data_backup = false;
@@ -1088,6 +1167,7 @@ int main (int argc, char **argv)
         { "first",                     no_argument,       0, 'f' },
         { "info",                      no_argument,       0, 'i' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
+        { "set-frequency",             required_argument, 0, 'r' },
         { "firmware-dump",             required_argument, 0, 'x' },
         { "firmware-update",           required_argument, 0, 'u' },
         { "restore-data-backup",       required_argument, 0, 'B' },
@@ -1106,7 +1186,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fil:x:u:NB:SO:CTz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fil:r:x:u:NB:SO:CTz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1122,6 +1202,9 @@ int main (int argc, char **argv)
             break;
         case 'l':
             set_sensitivity_level = strdup (optarg);
+            break;
+        case 'r':
+            set_frequency = strdup (optarg);
             break;
         case 'x':
             firmware_dump = strdup (optarg);
@@ -1184,6 +1267,7 @@ int main (int argc, char **argv)
     n_actions_require_device =
         info +
         !!set_sensitivity_level +
+        !!set_frequency +
         !!firmware_dump +
         !!(!!firmware_update + !!restore_data_backup) +
         scope;
@@ -1239,7 +1323,7 @@ int main (int argc, char **argv)
     else if (info)
         ret = run_info (ctx, first, bus_number, device_address);
     else if (set_sensitivity_level) {
-        long aux;
+        unsigned long aux;
 
         errno = 0;
         aux = strtoul (set_sensitivity_level, NULL, 10);
@@ -1248,6 +1332,16 @@ int main (int argc, char **argv)
             goto out;
         }
         ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, (uint8_t) aux);
+    } else if (set_frequency) {
+        unsigned long aux;
+
+        errno = 0;
+        aux = strtoul (set_frequency, NULL, 10);
+        if (errno) {
+            fprintf (stderr, "error: invalid --set-frequency value given: %s\n", set_frequency);
+            goto out;
+        }
+        ret = run_set_frequency (ctx, first, bus_number, device_address, aux);
     } else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
