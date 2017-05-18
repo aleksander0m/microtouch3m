@@ -368,7 +368,7 @@ microtouch3m_status_t microtouch3m_device_get_sensitivity_level (microtouch3m_de
 /**
  * microtouch3m_device_set_sensitivity_level:
  * @dev: a #microtouch3m_device_t.
- * @level: output location to store the sensitivity level.
+ * @level: the requested sensitivity level.
  *
  * Set the device sensitivity level.
  *
