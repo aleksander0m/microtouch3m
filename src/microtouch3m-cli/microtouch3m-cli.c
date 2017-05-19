@@ -502,6 +502,251 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: scope */
+
+#define STRAY_CORRECTION_TIMEOUT_MS 100
+
+struct async_report_scope_context_s {
+    uint64_t        n_records;
+    int             fd;
+    struct timespec start;
+    bool            scale_thousands;
+
+    /* stray correction logic */
+    bool            stray_correction;
+    struct timespec stray_timestamp;
+    int32_t         ul_stray_i;
+    int32_t         ul_stray_q;
+    int32_t         ur_stray_i;
+    int32_t         ur_stray_q;
+    int32_t         ll_stray_i;
+    int32_t         ll_stray_q;
+    int32_t         lr_stray_i;
+    int32_t         lr_stray_q;
+};
+
+static void
+timespec_diff (struct timespec *start,
+               struct timespec *stop,
+               struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+}
+
+static bool
+async_report_scope (microtouch3m_device_t *dev,
+                    microtouch3m_status_t  status,
+                    int32_t                ul_i,
+                    int32_t                ul_q,
+                    int32_t                ur_i,
+                    int32_t                ur_q,
+                    int32_t                ll_i,
+                    int32_t                ll_q,
+                    int32_t                lr_i,
+                    int32_t                lr_q,
+                    void                  *user_data)
+{
+    struct async_report_scope_context_s *context;
+    uint64_t                             ul_signal;
+    uint64_t                             ur_signal;
+    uint64_t                             ll_signal;
+    uint64_t                             lr_signal;
+    uint64_t                             ul_stray_signal = 0;
+    uint64_t                             ur_stray_signal = 0;
+    uint64_t                             ll_stray_signal = 0;
+    uint64_t                             lr_stray_signal = 0;
+    int64_t                              ul_corrected_signal = 0;
+    int64_t                              ur_corrected_signal = 0;
+    int64_t                              ll_corrected_signal = 0;
+    int64_t                              lr_corrected_signal = 0;
+    struct timespec                      current;
+    struct timespec                      difference;
+    double                               time_s;
+
+    context = (struct async_report_scope_context_s *) user_data;
+    context->n_records++;
+
+    /* Get current timer */
+    clock_gettime (CLOCK_MONOTONIC, &current);
+    timespec_diff (&context->start, &current, &difference);
+    time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+
+    /* Compute signals from I/Q components */
+    ul_signal = PROCESS_IQ (ul_i, ul_q);
+    ur_signal = PROCESS_IQ (ur_i, ur_q);
+    ll_signal = PROCESS_IQ (ll_i, ll_q);
+    lr_signal = PROCESS_IQ (lr_i, lr_q);
+
+    if (context->scale_thousands) {
+        ul_signal /= 1000.0;
+        ur_signal /= 1000.0;
+        ll_signal /= 1000.0;
+        lr_signal /= 1000.0;
+    }
+
+    /* Compute stray corrected signals */
+    if (context->stray_correction) {
+        ul_stray_signal = PROCESS_IQ (context->ul_stray_i, context->ul_stray_q);
+        ur_stray_signal = PROCESS_IQ (context->ur_stray_i, context->ur_stray_q);
+        ll_stray_signal = PROCESS_IQ (context->ll_stray_i, context->ll_stray_q);
+        lr_stray_signal = PROCESS_IQ (context->lr_stray_i, context->lr_stray_q);
+
+        if (context->scale_thousands) {
+            ul_stray_signal /= 1000.0;
+            ur_stray_signal /= 1000.0;
+            ll_stray_signal /= 1000.0;
+            lr_stray_signal /= 1000.0;
+        }
+
+        ul_corrected_signal = ((int64_t) ul_signal) - ((int64_t) ul_stray_signal);
+        ur_corrected_signal = ((int64_t) ur_signal) - ((int64_t) ur_stray_signal);
+        ll_corrected_signal = ((int64_t) ll_signal) - ((int64_t) ll_stray_signal);
+        lr_corrected_signal = ((int64_t) lr_signal) - ((int64_t) lr_stray_signal);
+    }
+
+    /* If output file requested, create record */
+    if (!(context->fd < 0)) {
+        char buffer[512];
+        int  n_chars;
+
+        if (context->stray_correction) {
+            n_chars = snprintf (buffer, sizeof (buffer),
+                                "%lf, "
+                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
+                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
+                                "%8" PRId64 ", %8" PRId64 ", %8" PRId64 ", %8" PRId64 "\n",
+                                time_s,
+                                ul_signal, ur_signal, ll_signal, lr_signal,
+                                ul_stray_signal, ur_stray_signal, ll_stray_signal, lr_stray_signal,
+                                ul_corrected_signal, ur_corrected_signal, ll_corrected_signal, lr_corrected_signal);
+        } else {
+            n_chars = snprintf (buffer, sizeof (buffer),
+                                "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
+                                time_s, ul_signal, ur_signal, ll_signal, lr_signal);
+        }
+
+        if (write (context->fd, buffer, n_chars) < 0)
+            fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
+        else
+            fsync (context->fd);
+    }
+
+    printf (CLEAR_LINE);
+    printf ("records: %" PRIu64 " | ", context->n_records);
+    printf ("time: %lf | ", time_s);
+    if (context->stray_correction) {
+        printf ("UL(c): %8"     PRId64 " | ", ul_corrected_signal);
+        printf ("UR(c): %8"     PRId64 " | ", ur_corrected_signal);
+        printf ("LL(c): %8"     PRId64 " | ", ll_corrected_signal);
+        printf ("LR(c): %8"     PRId64,       lr_corrected_signal);
+    } else {
+        printf ("UL: %8"     PRIu64 " | ", ul_signal);
+        printf ("UR: %8"     PRIu64 " | ", ur_signal);
+        printf ("LL: %8"     PRIu64 " | ", ll_signal);
+        printf ("LR: %8"     PRIu64,       lr_signal);
+    }
+    fflush (stdout);
+
+    /* stray update required? */
+    if (context->stray_correction) {
+        timespec_diff (&context->stray_timestamp, &current, &difference);
+        time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+        if (time_s > (STRAY_CORRECTION_TIMEOUT_MS / 1000.0))
+            return false;
+    }
+
+    return !stop_requested;
+}
+
+static const char *basic_header_str  = "#   time,       UL,       UR,       LL,       LR\n";
+static const char *strays_header_str = "#   time,       UL,       UR,       LL,       LR,    UL(s),    UR(s),    LL(s),    LR(s),    UL(c),    UR(c),    LL(c),    LR(c)\n";
+
+static int
+run_scope (microtouch3m_context_t *ctx,
+           const char             *out_file_path,
+           bool                    stray_correction,
+           bool                    scale_thousands,
+           bool                    first,
+           uint8_t                 bus_number,
+           uint8_t                 device_address)
+{
+    microtouch3m_device_t               *dev;
+    microtouch3m_status_t                st;
+    int                                  ret = EXIT_FAILURE;
+    struct async_report_scope_context_s  context = {
+        .stray_correction = stray_correction,
+        .scale_thousands = scale_thousands,
+        .n_records = 0,
+        .fd = -1,
+    };
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if (out_file_path) {
+        const char *header;
+
+        context.fd = open (out_file_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (context.fd < 0) {
+            fprintf (stderr, "error: couldn't open output file to write: %s\n", strerror (errno));
+            goto out;
+        }
+
+        header = (context.stray_correction ? strays_header_str :basic_header_str);
+        if (write (context.fd, header, strlen (header)) < 0)
+            fprintf (stderr, "error: couldn't write header to output file: %s\n", strerror (errno));
+        else
+            fsync (context.fd);
+    }
+
+    /* Start timer */
+    clock_gettime (CLOCK_MONOTONIC, &context.start);
+
+    printf ("Scope mode:\n");
+    while (!stop_requested) {
+        /* Update strays */
+        if (stray_correction) {
+            if ((st = microtouch3m_read_strays (dev,
+                                                &context.ul_stray_i,
+                                                &context.ul_stray_q,
+                                                &context.ur_stray_i,
+                                                &context.ur_stray_q,
+                                                &context.ll_stray_i,
+                                                &context.ll_stray_q,
+                                                &context.lr_stray_i,
+                                                &context.lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
+                fprintf (stderr, "error: couldn't read strays: %s\n", microtouch3m_status_to_string (st));
+                goto out;
+            }
+            clock_gettime (CLOCK_MONOTONIC, &context.stray_timestamp);
+        }
+
+        if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, &context)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
+            goto out;
+        }
+    }
+
+    printf ("\n");
+    printf ("Scope mode disabled\n");
+
+    ret = EXIT_SUCCESS;
+
+out:
+    if (!(context.fd < 0))
+        close (context.fd);
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* ACTION: firmware dump */
 
 static int
@@ -770,251 +1015,6 @@ out:
 }
 
 /******************************************************************************/
-/* ACTION: scope */
-
-#define STRAY_CORRECTION_TIMEOUT_MS 100
-
-struct async_report_scope_context_s {
-    uint64_t        n_records;
-    int             fd;
-    struct timespec start;
-    bool            scale_thousands;
-
-    /* stray correction logic */
-    bool            stray_correction;
-    struct timespec stray_timestamp;
-    int32_t         ul_stray_i;
-    int32_t         ul_stray_q;
-    int32_t         ur_stray_i;
-    int32_t         ur_stray_q;
-    int32_t         ll_stray_i;
-    int32_t         ll_stray_q;
-    int32_t         lr_stray_i;
-    int32_t         lr_stray_q;
-};
-
-static void
-timespec_diff (struct timespec *start,
-               struct timespec *stop,
-               struct timespec *result)
-{
-    if ((stop->tv_nsec - start->tv_nsec) < 0) {
-        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
-        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
-    } else {
-        result->tv_sec = stop->tv_sec - start->tv_sec;
-        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
-    }
-}
-
-static bool
-async_report_scope (microtouch3m_device_t *dev,
-                    microtouch3m_status_t  status,
-                    int32_t                ul_i,
-                    int32_t                ul_q,
-                    int32_t                ur_i,
-                    int32_t                ur_q,
-                    int32_t                ll_i,
-                    int32_t                ll_q,
-                    int32_t                lr_i,
-                    int32_t                lr_q,
-                    void                  *user_data)
-{
-    struct async_report_scope_context_s *context;
-    uint64_t                             ul_signal;
-    uint64_t                             ur_signal;
-    uint64_t                             ll_signal;
-    uint64_t                             lr_signal;
-    uint64_t                             ul_stray_signal = 0;
-    uint64_t                             ur_stray_signal = 0;
-    uint64_t                             ll_stray_signal = 0;
-    uint64_t                             lr_stray_signal = 0;
-    int64_t                              ul_corrected_signal = 0;
-    int64_t                              ur_corrected_signal = 0;
-    int64_t                              ll_corrected_signal = 0;
-    int64_t                              lr_corrected_signal = 0;
-    struct timespec                      current;
-    struct timespec                      difference;
-    double                               time_s;
-
-    context = (struct async_report_scope_context_s *) user_data;
-    context->n_records++;
-
-    /* Get current timer */
-    clock_gettime (CLOCK_MONOTONIC, &current);
-    timespec_diff (&context->start, &current, &difference);
-    time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
-
-    /* Compute signals from I/Q components */
-    ul_signal = PROCESS_IQ (ul_i, ul_q);
-    ur_signal = PROCESS_IQ (ur_i, ur_q);
-    ll_signal = PROCESS_IQ (ll_i, ll_q);
-    lr_signal = PROCESS_IQ (lr_i, lr_q);
-
-    if (context->scale_thousands) {
-        ul_signal /= 1000.0;
-        ur_signal /= 1000.0;
-        ll_signal /= 1000.0;
-        lr_signal /= 1000.0;
-    }
-
-    /* Compute stray corrected signals */
-    if (context->stray_correction) {
-        ul_stray_signal = PROCESS_IQ (context->ul_stray_i, context->ul_stray_q);
-        ur_stray_signal = PROCESS_IQ (context->ur_stray_i, context->ur_stray_q);
-        ll_stray_signal = PROCESS_IQ (context->ll_stray_i, context->ll_stray_q);
-        lr_stray_signal = PROCESS_IQ (context->lr_stray_i, context->lr_stray_q);
-
-        if (context->scale_thousands) {
-            ul_stray_signal /= 1000.0;
-            ur_stray_signal /= 1000.0;
-            ll_stray_signal /= 1000.0;
-            lr_stray_signal /= 1000.0;
-        }
-
-        ul_corrected_signal = ((int64_t) ul_signal) - ((int64_t) ul_stray_signal);
-        ur_corrected_signal = ((int64_t) ur_signal) - ((int64_t) ur_stray_signal);
-        ll_corrected_signal = ((int64_t) ll_signal) - ((int64_t) ll_stray_signal);
-        lr_corrected_signal = ((int64_t) lr_signal) - ((int64_t) lr_stray_signal);
-    }
-
-    /* If output file requested, create record */
-    if (!(context->fd < 0)) {
-        char buffer[512];
-        int  n_chars;
-
-        if (context->stray_correction) {
-            n_chars = snprintf (buffer, sizeof (buffer),
-                                "%lf, "
-                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
-                                "%8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", "
-                                "%8" PRId64 ", %8" PRId64 ", %8" PRId64 ", %8" PRId64 "\n",
-                                time_s,
-                                ul_signal, ur_signal, ll_signal, lr_signal,
-                                ul_stray_signal, ur_stray_signal, ll_stray_signal, lr_stray_signal,
-                                ul_corrected_signal, ur_corrected_signal, ll_corrected_signal, lr_corrected_signal);
-        } else {
-            n_chars = snprintf (buffer, sizeof (buffer),
-                                "%lf, %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 ", %8" PRIu64 "\n",
-                                time_s, ul_signal, ur_signal, ll_signal, lr_signal);
-        }
-
-        if (write (context->fd, buffer, n_chars) < 0)
-            fprintf (stderr, "error: couldn't write to output file: %s\n", strerror (errno));
-        else
-            fsync (context->fd);
-    }
-
-    printf (CLEAR_LINE);
-    printf ("records: %" PRIu64 " | ", context->n_records);
-    printf ("time: %lf | ", time_s);
-    if (context->stray_correction) {
-        printf ("UL(c): %8"     PRId64 " | ", ul_corrected_signal);
-        printf ("UR(c): %8"     PRId64 " | ", ur_corrected_signal);
-        printf ("LL(c): %8"     PRId64 " | ", ll_corrected_signal);
-        printf ("LR(c): %8"     PRId64,       lr_corrected_signal);
-    } else {
-        printf ("UL: %8"     PRIu64 " | ", ul_signal);
-        printf ("UR: %8"     PRIu64 " | ", ur_signal);
-        printf ("LL: %8"     PRIu64 " | ", ll_signal);
-        printf ("LR: %8"     PRIu64,       lr_signal);
-    }
-    fflush (stdout);
-
-    /* stray update required? */
-    if (context->stray_correction) {
-        timespec_diff (&context->stray_timestamp, &current, &difference);
-        time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
-        if (time_s > (STRAY_CORRECTION_TIMEOUT_MS / 1000.0))
-            return false;
-    }
-
-    return !stop_requested;
-}
-
-static const char *basic_header_str  = "#   time,       UL,       UR,       LL,       LR\n";
-static const char *strays_header_str = "#   time,       UL,       UR,       LL,       LR,    UL(s),    UR(s),    LL(s),    LR(s),    UL(c),    UR(c),    LL(c),    LR(c)\n";
-
-static int
-run_scope (microtouch3m_context_t *ctx,
-           const char             *out_file_path,
-           bool                    stray_correction,
-           bool                    scale_thousands,
-           bool                    first,
-           uint8_t                 bus_number,
-           uint8_t                 device_address)
-{
-    microtouch3m_device_t               *dev;
-    microtouch3m_status_t                st;
-    int                                  ret = EXIT_FAILURE;
-    struct async_report_scope_context_s  context = {
-        .stray_correction = stray_correction,
-        .scale_thousands = scale_thousands,
-        .n_records = 0,
-        .fd = -1,
-    };
-
-    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
-        goto out;
-
-    if (out_file_path) {
-        const char *header;
-
-        context.fd = open (out_file_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if (context.fd < 0) {
-            fprintf (stderr, "error: couldn't open output file to write: %s\n", strerror (errno));
-            goto out;
-        }
-
-        header = (context.stray_correction ? strays_header_str :basic_header_str);
-        if (write (context.fd, header, strlen (header)) < 0)
-            fprintf (stderr, "error: couldn't write header to output file: %s\n", strerror (errno));
-        else
-            fsync (context.fd);
-    }
-
-    /* Start timer */
-    clock_gettime (CLOCK_MONOTONIC, &context.start);
-
-    printf ("Scope mode:\n");
-    while (!stop_requested) {
-        /* Update strays */
-        if (stray_correction) {
-            if ((st = microtouch3m_read_strays (dev,
-                                                &context.ul_stray_i,
-                                                &context.ul_stray_q,
-                                                &context.ur_stray_i,
-                                                &context.ur_stray_q,
-                                                &context.ll_stray_i,
-                                                &context.ll_stray_q,
-                                                &context.lr_stray_i,
-                                                &context.lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
-                fprintf (stderr, "error: couldn't read strays: %s\n", microtouch3m_status_to_string (st));
-                goto out;
-            }
-            clock_gettime (CLOCK_MONOTONIC, &context.stray_timestamp);
-        }
-
-        if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_scope, &context)) != MICROTOUCH3M_STATUS_OK) {
-            fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
-            goto out;
-        }
-    }
-
-    printf ("\n");
-    printf ("Scope mode disabled\n");
-
-    ret = EXIT_SUCCESS;
-
-out:
-    if (!(context.fd < 0))
-        close (context.fd);
-    if (dev)
-        microtouch3m_device_unref (dev);
-    return ret;
-}
-
-/******************************************************************************/
 /* Logging */
 
 static pthread_t main_tid;
@@ -1051,17 +1051,17 @@ print_help (void)
             "  -l, --set-sensitivity-level=[LVL]  Set sensitivity level (See Notes).\n"
             "  -r, --set-frequency=[FREQ]         Set frequency (See Notes).\n"
             "\n"
-            "Firmware device actions:\n"
-            "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
-            "  -u, --firmware-update=[PATH]       Update firmware in the device (See Notes).\n"
-            "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
-            "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
-            "\n"
             "Scope device actions:\n"
             "  -S, --scope                        Run scope mode.\n"
             "  -O, --scope-file=[PATH]            Store the scope results in an output file.\n"
             "  -C, --scope-stray-correction       Perform stray correction during the scope operation.\n"
             "  -T, --scope-scale-thousands        Scale the values by 1000.\n"
+            "\n"
+            "Firmware device actions:\n"
+            "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
+            "  -u, --firmware-update=[PATH]       Update firmware in the device (See Notes).\n"
+            "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
+            "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
             "\n"
             "Firmware file actions:\n"
             "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
@@ -1149,14 +1149,14 @@ int main (int argc, char **argv)
     bool                    info                      = false;
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
-    char                   *firmware_dump             = NULL;
-    char                   *firmware_update           = NULL;
-    bool                    skip_removing_data_backup = false;
-    char                   *restore_data_backup       = NULL;
     bool                    scope                     = false;
     char                   *scope_file                = NULL;
     bool                    scope_stray_correction    = false;
     bool                    scope_scale_thousands     = false;
+    char                   *firmware_dump             = NULL;
+    char                   *firmware_update           = NULL;
+    bool                    skip_removing_data_backup = false;
+    char                   *restore_data_backup       = NULL;
     char                   *validate_fw_file          = NULL;
     bool                    debug                     = false;
     int                     ret                       = EXIT_FAILURE;
@@ -1168,14 +1168,14 @@ int main (int argc, char **argv)
         { "info",                      no_argument,       0, 'i' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "set-frequency",             required_argument, 0, 'r' },
-        { "firmware-dump",             required_argument, 0, 'x' },
-        { "firmware-update",           required_argument, 0, 'u' },
-        { "restore-data-backup",       required_argument, 0, 'B' },
-        { "skip-removing-data-backup", no_argument,       0, 'N' },
         { "scope",                     no_argument,       0, 'S' },
         { "scope-file",                required_argument, 0, 'O' },
         { "scope-stray-correction",    no_argument,       0, 'C' },
         { "scope-scale-thousands",     no_argument,       0, 'T' },
+        { "firmware-dump",             required_argument, 0, 'x' },
+        { "firmware-update",           required_argument, 0, 'u' },
+        { "restore-data-backup",       required_argument, 0, 'B' },
+        { "skip-removing-data-backup", no_argument,       0, 'N' },
         { "validate-fw-file",          required_argument, 0, 'z' },
         { "debug",                     no_argument,       0, 'd' },
         { "version",                   no_argument,       0, 'v' },
@@ -1186,7 +1186,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fil:r:x:u:NB:SO:CTz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fil:r:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1206,18 +1206,6 @@ int main (int argc, char **argv)
         case 'r':
             set_frequency = strdup (optarg);
             break;
-        case 'x':
-            firmware_dump = strdup (optarg);
-            break;
-        case 'u':
-            firmware_update = strdup (optarg);
-            break;
-        case 'N':
-            skip_removing_data_backup = true;
-            break;
-        case 'B':
-            restore_data_backup = strdup (optarg);
-            break;
         case 'S':
             scope = true;
             break;
@@ -1229,6 +1217,18 @@ int main (int argc, char **argv)
             break;
         case 'T':
             scope_scale_thousands = true;
+            break;
+        case 'x':
+            firmware_dump = strdup (optarg);
+            break;
+        case 'u':
+            firmware_update = strdup (optarg);
+            break;
+        case 'B':
+            restore_data_backup = strdup (optarg);
+            break;
+        case 'N':
+            skip_removing_data_backup = true;
             break;
         case 'z':
             validate_fw_file = strdup (optarg);
@@ -1342,12 +1342,12 @@ int main (int argc, char **argv)
             goto out;
         }
         ret = run_set_frequency (ctx, first, bus_number, device_address, aux);
-    } else if (firmware_dump)
+    } else if (scope)
+        ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
+    else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
         ret = run_firmware_update (ctx, first, bus_number, device_address, firmware_update, skip_removing_data_backup, restore_data_backup);
-    else if (scope)
-        ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
     else
         assert (0);
 
