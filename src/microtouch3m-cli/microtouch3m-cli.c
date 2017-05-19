@@ -181,6 +181,23 @@ reboot_and_wait_device (microtouch3m_context_t *ctx,
 }
 
 /******************************************************************************/
+/* Helper: substract timespecs */
+
+static void
+timespec_diff (struct timespec *start,
+               struct timespec *stop,
+               struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+}
+
+/******************************************************************************/
 /* Helper: firmware progress reporting */
 
 static bool disable_progress;
@@ -437,12 +454,14 @@ typedef struct {
 } freq_id_s;
 
 static const freq_id_s freq_id[] = {
-    { .value = 109096, .id = MICROTOUCH3M_DEVICE_FREQUENCY_109096 },
-    { .value =  95703, .id = MICROTOUCH3M_DEVICE_FREQUENCY_95703  },
-    { .value =  85286, .id = MICROTOUCH3M_DEVICE_FREQUENCY_85286  },
-    { .value =  76953, .id = MICROTOUCH3M_DEVICE_FREQUENCY_76953  },
     { .value =  70135, .id = MICROTOUCH3M_DEVICE_FREQUENCY_70135  },
+    { .value =  76953, .id = MICROTOUCH3M_DEVICE_FREQUENCY_76953  },
+    { .value =  85286, .id = MICROTOUCH3M_DEVICE_FREQUENCY_85286  },
+    { .value =  95703, .id = MICROTOUCH3M_DEVICE_FREQUENCY_95703  },
+    { .value = 109096, .id = MICROTOUCH3M_DEVICE_FREQUENCY_109096 },
 };
+
+#define N_FREQS (sizeof (freq_id) / sizeof (freq_id[0]))
 
 static int
 run_set_frequency (microtouch3m_context_t *ctx,
@@ -460,12 +479,12 @@ run_set_frequency (microtouch3m_context_t *ctx,
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
-    for (i = 0; i < (sizeof (freq_id) / sizeof (freq_id[0])); i++) {
+    for (i = 0; i < N_FREQS; i++) {
         if (freq_id[i].value == frequency)
             break;
     }
 
-    if (i == (sizeof (freq_id) / sizeof (freq_id[0]))) {
+    if (i == N_FREQS) {
         fprintf (stderr, "error: unknown frequency preset requested: %lumHz\n", frequency);
         goto out;
     }
@@ -502,6 +521,267 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: frequency check */
+
+/* Ignore the first 5 records. At least the first one seems to have some
+ * huge signal values reported that we should better ignore.
+ */
+#define FREQUENCY_CHECK_IGNORE_FIRST_N_RECORDS 5
+
+/* Duration of the check for each frequency */
+#define FREQUENCY_CHECK_TIMEOUT_S 5
+
+struct async_report_frequency_check_context_s {
+    struct timespec start;
+    unsigned long   n_records;
+    uint64_t        ul_stray_signal;
+    uint64_t        ur_stray_signal;
+    uint64_t        ll_stray_signal;
+    uint64_t        lr_stray_signal;
+    int64_t         ul_min_corrected_signal;
+    int64_t         ur_min_corrected_signal;
+    int64_t         ll_min_corrected_signal;
+    int64_t         lr_min_corrected_signal;
+    int64_t         ul_max_corrected_signal;
+    int64_t         ur_max_corrected_signal;
+    int64_t         ll_max_corrected_signal;
+    int64_t         lr_max_corrected_signal;
+};
+
+static bool
+async_report_frequency_check (microtouch3m_device_t *dev,
+                              microtouch3m_status_t  status,
+                              int32_t                ul_i,
+                              int32_t                ul_q,
+                              int32_t                ur_i,
+                              int32_t                ur_q,
+                              int32_t                ll_i,
+                              int32_t                ll_q,
+                              int32_t                lr_i,
+                              int32_t                lr_q,
+                              void                  *user_data)
+{
+    struct async_report_frequency_check_context_s *context;
+    uint64_t                                       ul_signal;
+    uint64_t                                       ur_signal;
+    uint64_t                                       ll_signal;
+    uint64_t                                       lr_signal;
+    int64_t                                        ul_corrected_signal = 0;
+    int64_t                                        ur_corrected_signal = 0;
+    int64_t                                        ll_corrected_signal = 0;
+    int64_t                                        lr_corrected_signal = 0;
+    struct timespec                                current;
+    struct timespec                                difference;
+    double                                         time_s;
+
+    context = (struct async_report_frequency_check_context_s *) user_data;
+    context->n_records++;
+
+    if (context->n_records <= FREQUENCY_CHECK_IGNORE_FIRST_N_RECORDS)
+        return true;
+
+    /* Compute signals from I/Q components */
+    ul_signal = PROCESS_IQ (ul_i, ul_q);
+    ur_signal = PROCESS_IQ (ur_i, ur_q);
+    ll_signal = PROCESS_IQ (ll_i, ll_q);
+    lr_signal = PROCESS_IQ (lr_i, lr_q);
+
+    ul_corrected_signal = ((int64_t) ul_signal) - ((int64_t) context->ul_stray_signal);
+    ur_corrected_signal = ((int64_t) ur_signal) - ((int64_t) context->ur_stray_signal);
+    ll_corrected_signal = ((int64_t) ll_signal) - ((int64_t) context->ll_stray_signal);
+    lr_corrected_signal = ((int64_t) lr_signal) - ((int64_t) context->lr_stray_signal);
+
+#if 0
+    printf ("\t\tUL(s): %" PRId64 " | UR(s): %" PRId64 " | LL(s): %" PRId64 " | LR(s): %" PRId64 "\n",
+            ul_corrected_signal, ur_corrected_signal, ll_corrected_signal, lr_corrected_signal);
+#endif
+
+    if (context->n_records == (FREQUENCY_CHECK_IGNORE_FIRST_N_RECORDS + 1)) {
+        context->ul_min_corrected_signal = context->ul_max_corrected_signal = ul_corrected_signal;
+        context->ur_min_corrected_signal = context->ur_max_corrected_signal = ur_corrected_signal;
+        context->ll_min_corrected_signal = context->ll_max_corrected_signal = ll_corrected_signal;
+        context->lr_min_corrected_signal = context->lr_max_corrected_signal = lr_corrected_signal;
+    } else {
+        context->ul_min_corrected_signal = (ul_corrected_signal < context->ul_min_corrected_signal ? ul_corrected_signal : context->ul_min_corrected_signal);
+        context->ur_min_corrected_signal = (ur_corrected_signal < context->ur_min_corrected_signal ? ur_corrected_signal : context->ur_min_corrected_signal);
+        context->ll_min_corrected_signal = (ll_corrected_signal < context->ll_min_corrected_signal ? ll_corrected_signal : context->ll_min_corrected_signal);
+        context->lr_min_corrected_signal = (lr_corrected_signal < context->lr_min_corrected_signal ? lr_corrected_signal : context->lr_min_corrected_signal);
+        context->ul_max_corrected_signal = (ul_corrected_signal > context->ul_max_corrected_signal ? ul_corrected_signal : context->ul_max_corrected_signal);
+        context->ur_max_corrected_signal = (ur_corrected_signal > context->ur_max_corrected_signal ? ur_corrected_signal : context->ur_max_corrected_signal);
+        context->ll_max_corrected_signal = (ll_corrected_signal > context->ll_max_corrected_signal ? ll_corrected_signal : context->ll_max_corrected_signal);
+        context->lr_max_corrected_signal = (lr_corrected_signal > context->lr_max_corrected_signal ? lr_corrected_signal : context->lr_max_corrected_signal);
+    }
+
+    /* Get current timer */
+    clock_gettime (CLOCK_MONOTONIC, &current);
+    timespec_diff (&context->start, &current, &difference);
+    time_s = difference.tv_sec + (difference.tv_nsec / 1E9);
+
+    return (!stop_requested && (time_s < FREQUENCY_CHECK_TIMEOUT_S));
+}
+
+static microtouch3m_status_t
+run_frequency_check_iteration (microtouch3m_device_t           *dev,
+                               microtouch3m_device_frequency_t  id,
+                               uint64_t                        *out)
+{
+    microtouch3m_status_t                         st;
+    struct async_report_frequency_check_context_s context = { 0 };
+
+    printf ("running frequency check for %s...\n",
+            microtouch3m_device_frequency_to_string (id));
+
+    /* Change frequency */
+    {
+        if ((st = microtouch3m_device_set_frequency (dev, id)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't set frequency: %s\n", microtouch3m_status_to_string (st));
+            return st;
+        }
+
+        if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_SOFT)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't soft reset controller: %s\n", microtouch3m_status_to_string (st));
+            return st;
+        }
+    }
+
+    /* Read strays.
+     *
+     * NOTE: there truly is no point in performing stray correction when we want
+     * to measure peak-to-peak noise, as the difference between the maximum and
+     * minimum values will be the same if the same correction is applied to
+     * both... but we leave it like this, because the Windows application reads
+     * strays at the beginning of the iteration and so they should really be
+     * for something, right? */
+    {
+        int32_t ul_stray_i, ul_stray_q;
+        int32_t ur_stray_i, ur_stray_q;
+        int32_t ll_stray_i, ll_stray_q;
+        int32_t lr_stray_i, lr_stray_q;
+
+        if ((st = microtouch3m_read_strays (dev,
+                                            &ul_stray_i, &ul_stray_q,
+                                            &ur_stray_i, &ur_stray_q,
+                                            &ll_stray_i, &ll_stray_q,
+                                            &lr_stray_i, &lr_stray_q)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't read strays: %s\n", microtouch3m_status_to_string (st));
+            return st;
+        }
+
+        context.ul_stray_signal = PROCESS_IQ (ul_stray_i, ul_stray_q);
+        context.ur_stray_signal = PROCESS_IQ (ur_stray_i, ur_stray_q);
+        context.ll_stray_signal = PROCESS_IQ (ll_stray_i, ll_stray_q);
+        context.lr_stray_signal = PROCESS_IQ (lr_stray_i, lr_stray_q);
+    }
+
+    /* Run scope mode */
+    {
+        clock_gettime (CLOCK_MONOTONIC, &context.start);
+        if ((st = microtouch3m_device_monitor_async_reports (dev, async_report_frequency_check, &context)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't run scope mode: %s\n", microtouch3m_status_to_string (st));
+            return st;
+        }
+        if (stop_requested) {
+            fprintf (stderr, "error: operation aborted");
+            return MICROTOUCH3M_STATUS_FAILED;
+        }
+    }
+
+    /* Process results */
+    {
+        int64_t  ul_noise;
+        int64_t  ur_noise;
+        int64_t  ll_noise;
+        int64_t  lr_noise;
+        uint64_t total_noise;
+
+#if 0
+        printf ("\tUL(smax): %" PRId64 " | UR(smax): %" PRId64 " | LL(smax): %" PRId64 " | LR(smax): %" PRId64 "\n",
+                context.ul_max_corrected_signal, context.ur_max_corrected_signal, context.ll_max_corrected_signal, context.lr_max_corrected_signal);
+        printf ("\tUL(smin): %" PRId64 " | UR(smin): %" PRId64 " | LL(smin): %" PRId64 " | LR(smin): %" PRId64 "\n",
+                context.ul_min_corrected_signal, context.ur_min_corrected_signal, context.ll_min_corrected_signal, context.lr_min_corrected_signal);
+#endif
+
+        ul_noise = (context.ul_max_corrected_signal - context.ul_min_corrected_signal);
+        ur_noise = (context.ur_max_corrected_signal - context.ur_min_corrected_signal);
+        ll_noise = (context.ll_max_corrected_signal - context.ll_min_corrected_signal);
+        lr_noise = (context.lr_max_corrected_signal - context.lr_min_corrected_signal);
+
+        assert ((ul_noise >= 0) && (ur_noise >= 0) && (ll_noise >= 0) && (lr_noise >= 0));
+        total_noise = ul_noise + ur_noise + ll_noise + lr_noise;
+
+        printf ("\tMeasured noise (pk-pk): UL: %" PRId64 " | UR: %" PRId64 " | LL: %" PRId64 " | LR: %" PRId64 " | TOTAL: %" PRIu64 "\n",
+                ul_noise, ur_noise, ll_noise, lr_noise, total_noise);
+
+        *out = total_noise;
+    }
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+struct freq_noise_s {
+    microtouch3m_device_frequency_t id;
+    uint64_t                        noise;
+};
+
+static int
+run_frequency_check (microtouch3m_context_t *ctx,
+                     bool                    first,
+                     uint8_t                 bus_number,
+                     uint8_t                 device_address)
+{
+    microtouch3m_device_t *dev;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+    int                    i;
+    struct freq_noise_s    freq_noise[N_FREQS];
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    for (i = 0; i < N_FREQS; i++) {
+        uint64_t noise;
+        int      target_i;
+
+        if ((st = run_frequency_check_iteration (dev, freq_id[i].id, &noise)) != MICROTOUCH3M_STATUS_OK)
+            goto out;
+
+        /* Add results to array already ordered from min noise to max noise */
+
+        if (i == 0)
+            target_i = 0;
+        else {
+            for (target_i = 0; target_i < i; target_i++) {
+                if (noise <= freq_noise[target_i].noise)
+                    break;
+            }
+        }
+        if (target_i < i)
+            memmove (&freq_noise[target_i + 1], &freq_noise[target_i], (i - target_i) * sizeof (struct freq_noise_s));
+        freq_noise[target_i].noise = noise;
+        freq_noise[target_i].id    = freq_id[i].id;
+    }
+
+    printf ("\n"
+            "frequency checks finished:\n");
+    for (i = 0; i < N_FREQS; i++) {
+        printf ("\t");
+        if (i == 0)
+            printf ("[best]  ");
+        else if (i == (N_FREQS - 1))
+            printf ("[worst] ");
+        else
+            printf ("        ");
+        printf ("%9s: %" PRIu64 "\n", microtouch3m_device_frequency_to_string (freq_noise[i].id), freq_noise[i].noise);
+    }
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* ACTION: scope */
 
 #define STRAY_CORRECTION_TIMEOUT_MS 100
@@ -524,20 +804,6 @@ struct async_report_scope_context_s {
     int32_t         lr_stray_i;
     int32_t         lr_stray_q;
 };
-
-static void
-timespec_diff (struct timespec *start,
-               struct timespec *stop,
-               struct timespec *result)
-{
-    if ((stop->tv_nsec - start->tv_nsec) < 0) {
-        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
-        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
-    } else {
-        result->tv_sec = stop->tv_sec - start->tv_sec;
-        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
-    }
-}
 
 static bool
 async_report_scope (microtouch3m_device_t *dev,
@@ -1051,6 +1317,9 @@ print_help (void)
             "  -l, --set-sensitivity-level=[LVL]  Set sensitivity level (See Notes).\n"
             "  -r, --set-frequency=[FREQ]         Set frequency (See Notes).\n"
             "\n"
+            "Frequency check device actions:\n"
+            "  -F, --frequency-check              Run frequency check mode.\n"
+            "\n"
             "Scope device actions:\n"
             "  -S, --scope                        Run scope mode.\n"
             "  -O, --scope-file=[PATH]            Store the scope results in an output file.\n"
@@ -1149,6 +1418,7 @@ int main (int argc, char **argv)
     bool                    info                      = false;
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
+    bool                    frequency_check           = false;
     bool                    scope                     = false;
     char                   *scope_file                = NULL;
     bool                    scope_stray_correction    = false;
@@ -1168,6 +1438,7 @@ int main (int argc, char **argv)
         { "info",                      no_argument,       0, 'i' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "set-frequency",             required_argument, 0, 'r' },
+        { "frequency-check",           no_argument,       0, 'F' },
         { "scope",                     no_argument,       0, 'S' },
         { "scope-file",                required_argument, 0, 'O' },
         { "scope-stray-correction",    no_argument,       0, 'C' },
@@ -1186,7 +1457,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fil:r:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fil:r:FSO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1205,6 +1476,9 @@ int main (int argc, char **argv)
             break;
         case 'r':
             set_frequency = strdup (optarg);
+            break;
+        case 'F':
+            frequency_check = true;
             break;
         case 'S':
             scope = true;
@@ -1268,9 +1542,10 @@ int main (int argc, char **argv)
         info +
         !!set_sensitivity_level +
         !!set_frequency +
+        frequency_check +
+        scope +
         !!firmware_dump +
-        !!(!!firmware_update + !!restore_data_backup) +
-        scope;
+        !!(!!firmware_update + !!restore_data_backup);
 
     n_actions =
         list +
@@ -1344,6 +1619,8 @@ int main (int argc, char **argv)
         ret = run_set_frequency (ctx, first, bus_number, device_address, aux);
     } else if (scope)
         ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
+    else if (frequency_check)
+        ret = run_frequency_check (ctx, first, bus_number, device_address);
     else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
