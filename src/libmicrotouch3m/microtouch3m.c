@@ -661,6 +661,67 @@ run_out_request (microtouch3m_device_t *dev,
 }
 
 /******************************************************************************/
+/* Status */
+
+struct standard_status_report_s {
+    uint8_t  report_id;
+    uint16_t poc_status;
+    uint8_t  cmd_status;
+    uint8_t  touch_status;
+    uint16_t async_reports;
+    uint8_t  reserved;
+} __attribute__((packed));
+
+struct extended_status_report_s {
+    struct standard_status_report_s standard;
+    uint8_t  reserved;
+    uint16_t extended_poc_status;
+    uint8_t  reserved2[9];
+} __attribute__((packed));
+
+#if 0
+
+static microtouch3m_status_t
+device_get_status_standard (microtouch3m_device_t           *dev,
+                            struct standard_status_report_s *out_status)
+{
+    microtouch3m_status_t st;
+
+    microtouch3m_log ("reading standard status...");
+    if ((st = run_in_request (dev,
+                              REQUEST_STATUS,
+                              0x0000,
+                              0x0000,
+                              (uint8_t *) out_status,
+                              sizeof (struct standard_status_report_s),
+                              NULL)) != MICROTOUCH3M_STATUS_OK) {
+        microtouch3m_log ("error: couldn't read standard status");
+    }
+    return st;
+}
+
+#endif
+
+static microtouch3m_status_t
+device_get_status_extended (microtouch3m_device_t           *dev,
+                            struct extended_status_report_s *out_status)
+{
+    microtouch3m_status_t st;
+
+    microtouch3m_log ("reading extended status...");
+    if ((st = run_in_request (dev,
+                              REQUEST_STATUS,
+                              0x0000,
+                              0x0000,
+                              (uint8_t *) out_status,
+                              sizeof (struct extended_status_report_s),
+                              NULL)) != MICROTOUCH3M_STATUS_OK) {
+        microtouch3m_log ("error: couldn't read extended status");
+    }
+    return st;
+}
+
+/******************************************************************************/
 /* Query controller ID */
 
 struct report_controller_id_s {
@@ -1092,18 +1153,13 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
 
     microtouch3m_log ("reading current status...");
     {
-        uint8_t buffer[20];
+        struct extended_status_report_s status;
 
-        if ((st = run_in_request (dev,
-                                  REQUEST_STATUS,
-                                  0x0000,
-                                  0x0000,
-                                  buffer,
-                                  sizeof (buffer),
-                                  NULL)) != MICROTOUCH3M_STATUS_OK) {
-            microtouch3m_log ("error: couldn't read current status");
+        if ((st = device_get_status_extended (dev, &status)) != MICROTOUCH3M_STATUS_OK)
             return st;
-        }
+
+        /* NOTE: we probably want to do something here, like check that all reports are
+         * disabled */
     }
 
     microtouch3m_log ("enable scope data reports...");
