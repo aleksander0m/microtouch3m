@@ -623,7 +623,8 @@ async_report_frequency_check (microtouch3m_device_t *dev,
 static microtouch3m_status_t
 run_frequency_check_iteration (microtouch3m_device_t           *dev,
                                microtouch3m_device_frequency_t  id,
-                               uint64_t                        *out)
+                               uint64_t                        *out_pkpk_noise,
+                               uint64_t                        *out_pkst_noise)
 {
     microtouch3m_status_t                         st;
     struct async_report_frequency_check_context_s context = { 0 };
@@ -644,14 +645,7 @@ run_frequency_check_iteration (microtouch3m_device_t           *dev,
         }
     }
 
-    /* Read strays.
-     *
-     * NOTE: there truly is no point in performing stray correction when we want
-     * to measure peak-to-peak noise, as the difference between the maximum and
-     * minimum values will be the same if the same correction is applied to
-     * both... but we leave it like this, because the Windows application reads
-     * strays at the beginning of the iteration and so they should really be
-     * for something, right? */
+    /* Read strays */
     {
         int32_t ul_stray_i, ul_stray_q;
         int32_t ur_stray_i, ur_stray_q;
@@ -701,18 +695,48 @@ run_frequency_check_iteration (microtouch3m_device_t           *dev,
                 context.ul_min_corrected_signal, context.ur_min_corrected_signal, context.ll_min_corrected_signal, context.lr_min_corrected_signal);
 #endif
 
-        ul_noise = (context.ul_max_corrected_signal - context.ul_min_corrected_signal);
-        ur_noise = (context.ur_max_corrected_signal - context.ur_min_corrected_signal);
-        ll_noise = (context.ll_max_corrected_signal - context.ll_min_corrected_signal);
-        lr_noise = (context.lr_max_corrected_signal - context.lr_min_corrected_signal);
+        /* peak to peak noise = (max - min). The difference between the maximum
+         * and minimum signal measurement. Doesn't really matter if the stray
+         * correction was applied or not to get this measurement. */
+        {
+            ul_noise = (context.ul_max_corrected_signal - context.ul_min_corrected_signal);
+            ur_noise = (context.ur_max_corrected_signal - context.ur_min_corrected_signal);
+            ll_noise = (context.ll_max_corrected_signal - context.ll_min_corrected_signal);
+            lr_noise = (context.lr_max_corrected_signal - context.lr_min_corrected_signal);
+            assert ((ul_noise >= 0) && (ur_noise >= 0) && (ll_noise >= 0) && (lr_noise >= 0));
+            total_noise = ul_noise + ur_noise + ll_noise + lr_noise;
 
-        assert ((ul_noise >= 0) && (ur_noise >= 0) && (ll_noise >= 0) && (lr_noise >= 0));
-        total_noise = ul_noise + ur_noise + ll_noise + lr_noise;
+            printf ("\tMeasured noise (pk-pk): UL: %" PRId64 " | UR: %" PRId64 " | LL: %" PRId64 " | LR: %" PRId64 " | TOTAL: %" PRIu64 "\n",
+                    ul_noise, ur_noise, ll_noise, lr_noise, total_noise);
 
-        printf ("\tMeasured noise (pk-pk): UL: %" PRId64 " | UR: %" PRId64 " | LL: %" PRId64 " | LR: %" PRId64 " | TOTAL: %" PRIu64 "\n",
-                ul_noise, ur_noise, ll_noise, lr_noise, total_noise);
+            *out_pkpk_noise = total_noise;
+        }
 
-        *out = total_noise;
+        /* peak to stray noise = |max|. Given that the values are corrected with
+         * the strays, the max should be > 0 always (if it isn't, we warn about it) */
+        {
+#define ABS(A) (A < 0 ? (0 - A) : A)
+            if (context.ul_max_corrected_signal < 0)
+                printf ("[WARNING] UL stray correction not correctly applied\n");
+            ul_noise = ABS (context.ul_max_corrected_signal);
+            if (context.ur_max_corrected_signal < 0)
+                printf ("[WARNING] UR stray correction not correctly applied\n");
+            ur_noise = ABS (context.ur_max_corrected_signal);
+            if (context.ll_max_corrected_signal < 0)
+                printf ("[WARNING] LL stray correction not correctly applied\n");
+            ll_noise = ABS (context.ll_max_corrected_signal);
+            if (context.lr_max_corrected_signal < 0)
+                printf ("[WARNING] LR stray correction not correctly applied\n");
+            lr_noise = ABS (context.lr_max_corrected_signal);
+            assert ((ul_noise >= 0) && (ur_noise >= 0) && (ll_noise >= 0) && (lr_noise >= 0));
+            total_noise = ul_noise + ur_noise + ll_noise + lr_noise;
+
+            printf ("\tMeasured noise (pk-st): UL: %" PRId64 " | UR: %" PRId64 " | LL: %" PRId64 " | LR: %" PRId64 " | TOTAL: %" PRIu64 "\n",
+                    ul_noise, ur_noise, ll_noise, lr_noise, total_noise);
+
+            *out_pkst_noise = total_noise;
+#undef ABS
+        }
     }
 
     return MICROTOUCH3M_STATUS_OK;
@@ -722,6 +746,43 @@ struct freq_noise_s {
     microtouch3m_device_frequency_t id;
     uint64_t                        noise;
 };
+
+static void
+frequency_check_results_print (const char                *title,
+                               const struct freq_noise_s *array)
+{
+    int i;
+
+    printf ("\n%s:\n", title);
+    for (i = 0; i < N_FREQS; i++) {
+        printf ("\t");
+        if (i == 0)
+            printf ("[best]  ");
+        else if (i == (N_FREQS - 1))
+            printf ("[worst] ");
+        else
+            printf ("        ");
+        printf ("%9s: %" PRIu64 "\n", microtouch3m_device_frequency_to_string (array[i].id), array[i].noise);
+    }
+}
+
+static void
+frequency_check_results_append (struct freq_noise_s             *array,
+                                int                              n_array_items,
+                                microtouch3m_device_frequency_t  id,
+                                uint64_t                         noise)
+{
+    int target_i;
+
+    for (target_i = 0; target_i < n_array_items; target_i++) {
+        if (noise <= array[target_i].noise)
+            break;
+    }
+    if (target_i < n_array_items)
+        memmove (&array[target_i + 1], &array[target_i], (n_array_items - target_i) * sizeof (struct freq_noise_s));
+    array[target_i].noise = noise;
+    array[target_i].id    = id;
+}
 
 static int
 run_frequency_check (microtouch3m_context_t *ctx,
@@ -733,46 +794,27 @@ run_frequency_check (microtouch3m_context_t *ctx,
     microtouch3m_status_t  st;
     int                    ret = EXIT_FAILURE;
     int                    i;
-    struct freq_noise_s    freq_noise[N_FREQS];
+    struct freq_noise_s    freq_pkpk_noise[N_FREQS];
+    struct freq_noise_s    freq_pkst_noise[N_FREQS];
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
     for (i = 0; i < N_FREQS; i++) {
-        uint64_t noise;
-        int      target_i;
+        uint64_t pkpk_noise;
+        uint64_t pkst_noise;
 
-        if ((st = run_frequency_check_iteration (dev, freq_id[i].id, &noise)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = run_frequency_check_iteration (dev, freq_id[i].id, &pkpk_noise, &pkst_noise)) != MICROTOUCH3M_STATUS_OK)
             goto out;
 
-        /* Add results to array already ordered from min noise to max noise */
-
-        if (i == 0)
-            target_i = 0;
-        else {
-            for (target_i = 0; target_i < i; target_i++) {
-                if (noise <= freq_noise[target_i].noise)
-                    break;
-            }
-        }
-        if (target_i < i)
-            memmove (&freq_noise[target_i + 1], &freq_noise[target_i], (i - target_i) * sizeof (struct freq_noise_s));
-        freq_noise[target_i].noise = noise;
-        freq_noise[target_i].id    = freq_id[i].id;
+        frequency_check_results_append (freq_pkpk_noise, i, freq_id[i].id, pkpk_noise);
+        frequency_check_results_append (freq_pkst_noise, i, freq_id[i].id, pkst_noise);
     }
 
-    printf ("\n"
-            "frequency checks finished:\n");
-    for (i = 0; i < N_FREQS; i++) {
-        printf ("\t");
-        if (i == 0)
-            printf ("[best]  ");
-        else if (i == (N_FREQS - 1))
-            printf ("[worst] ");
-        else
-            printf ("        ");
-        printf ("%9s: %" PRIu64 "\n", microtouch3m_device_frequency_to_string (freq_noise[i].id), freq_noise[i].noise);
-    }
+    printf ("\nfrequency checks finished\n");
+    frequency_check_results_print ("peak-to-peak noise measurements",  freq_pkpk_noise);
+    frequency_check_results_print ("peak-to-stray noise measurements", freq_pkst_noise);
+
     ret = EXIT_SUCCESS;
 
 out:
