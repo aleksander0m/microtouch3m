@@ -872,6 +872,9 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
     case MICROTOUCH3M_DEVICE_RESET_HARD:
         expected_cmd_status = CMD_STATUS_HARD_RESET_OCCURED;
         break;
+    default:
+        microtouch3m_log ("error: invalid reset type requested");
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
     }
 
     if ((st = device_wait_cmd_status (dev,
