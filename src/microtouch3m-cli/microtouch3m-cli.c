@@ -627,7 +627,9 @@ run_frequency_check_iteration (microtouch3m_device_t           *dev,
                                uint64_t                        *out_pkst_noise)
 {
     microtouch3m_status_t                         st;
-    struct async_report_frequency_check_context_s context = { 0 };
+    struct async_report_frequency_check_context_s context;
+
+    memset (&context, 0, sizeof (context));
 
     printf ("running frequency check for %s...\n",
             microtouch3m_device_frequency_to_string (id));
