@@ -33,6 +33,8 @@
 #include <string.h>
 #include <errno.h>
 #include <endian.h>
+#include <unistd.h>
+
 #include <libusb.h>
 
 #include "common.h"
@@ -663,6 +665,15 @@ run_out_request (microtouch3m_device_t *dev,
 /******************************************************************************/
 /* Status */
 
+typedef enum {
+    CMD_STATUS_FAILURE            = 0,
+    CMD_STATUS_ONGOING            = 1,
+    CMD_STATUS_STAGE_1_COMPLETED  = 2,
+    CMD_STATUS_COMPLETED          = 3,
+    CMD_STATUS_SOFT_RESET_OCCURED = 4,
+    CMD_STATUS_HARD_RESET_OCCURED = 5,
+} cmd_status_t;
+
 struct standard_status_report_s {
     uint8_t  report_id;
     uint16_t poc_status;
@@ -678,8 +689,6 @@ struct extended_status_report_s {
     uint16_t extended_poc_status;
     uint8_t  reserved2[9];
 } __attribute__((packed));
-
-#if 0
 
 static microtouch3m_status_t
 device_get_status_standard (microtouch3m_device_t           *dev,
@@ -700,8 +709,6 @@ device_get_status_standard (microtouch3m_device_t           *dev,
     return st;
 }
 
-#endif
-
 static microtouch3m_status_t
 device_get_status_extended (microtouch3m_device_t           *dev,
                             struct extended_status_report_s *out_status)
@@ -719,6 +726,30 @@ device_get_status_extended (microtouch3m_device_t           *dev,
         microtouch3m_log ("error: couldn't read extended status");
     }
     return st;
+}
+
+static microtouch3m_status_t
+device_wait_cmd_status (microtouch3m_device_t *dev,
+                        cmd_status_t           cmd_status,
+                        unsigned int           retry_ms,
+                        unsigned int           max_retries)
+{
+    unsigned int          n_retries;
+    microtouch3m_status_t st;
+
+    for (n_retries = 0; n_retries < max_retries; n_retries++) {
+        struct standard_status_report_s status;
+
+        if ((st = device_get_status_standard (dev, &status)) != MICROTOUCH3M_STATUS_OK)
+            return st;
+
+        if (status.cmd_status == cmd_status)
+            return MICROTOUCH3M_STATUS_OK;
+
+        usleep (retry_ms * 1000);
+    }
+
+    return MICROTOUCH3M_STATUS_FAILED;
 }
 
 /******************************************************************************/
@@ -786,6 +817,9 @@ microtouch3m_device_query_controller_id (microtouch3m_device_t *dev,
 /******************************************************************************/
 /* Reset */
 
+#define RESET_STATUS_CHECKS_MAX        20
+#define RESET_STATUS_CHECKS_TIMEOUT_MS 100
+
 static const char *reset_str[] = {
     [MICROTOUCH3M_DEVICE_RESET_SOFT]   = "soft",
     [MICROTOUCH3M_DEVICE_RESET_HARD]   = "hard",
@@ -804,6 +838,7 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
 {
     microtouch3m_status_t st;
     enum libusb_error     usb_error;
+    cmd_status_t          expected_cmd_status;
 
     microtouch3m_log ("requesting controller reset: %s", microtouch3m_device_reset_to_string (reset));
     if ((st = run_out_request (dev,
@@ -813,14 +848,37 @@ microtouch3m_device_reset (microtouch3m_device_t       *dev,
                                NULL,
                                0,
                                &usb_error)) != MICROTOUCH3M_STATUS_OK) {
-        /* EIO on a reboot request is perfectly fine */
+        /* EIO on a reboot request is what we expect */
         if ((reset == MICROTOUCH3M_DEVICE_RESET_REBOOT) &&
             (st == MICROTOUCH3M_STATUS_INVALID_IO) &&
             (usb_error == LIBUSB_ERROR_PIPE)) {
-            /* noop */
-        } else
-            return st;
+            microtouch3m_log ("successfully requested controller 'reboot' reset");
+            return MICROTOUCH3M_STATUS_OK;
+        }
+
+        /* All other errors are fatal */
+        return st;
     }
+
+    /* If for some reason we get here during a 'reboot' reset, return an error.
+     * We do want to get a EPIPE error */
+    switch (reset) {
+    case MICROTOUCH3M_DEVICE_RESET_REBOOT:
+        microtouch3m_log ("error: reboot reset request ignored");
+        return MICROTOUCH3M_STATUS_FAILED;
+    case MICROTOUCH3M_DEVICE_RESET_SOFT:
+        expected_cmd_status = CMD_STATUS_SOFT_RESET_OCCURED;
+        break;
+    case MICROTOUCH3M_DEVICE_RESET_HARD:
+        expected_cmd_status = CMD_STATUS_HARD_RESET_OCCURED;
+        break;
+    }
+
+    if ((st = device_wait_cmd_status (dev,
+                                      expected_cmd_status,
+                                      RESET_STATUS_CHECKS_TIMEOUT_MS,
+                                      RESET_STATUS_CHECKS_MAX)) != MICROTOUCH3M_STATUS_OK)
+        return st;
 
     /* Success! */
     microtouch3m_log ("successfully requested controller reset");
