@@ -792,15 +792,23 @@ run_frequency_check (microtouch3m_context_t *ctx,
                      uint8_t                 bus_number,
                      uint8_t                 device_address)
 {
-    microtouch3m_device_t *dev;
-    microtouch3m_status_t  st;
-    int                    ret = EXIT_FAILURE;
-    int                    i;
-    struct freq_noise_s    freq_pkpk_noise[N_FREQS];
-    struct freq_noise_s    freq_pkst_noise[N_FREQS];
+    microtouch3m_device_t           *dev;
+    microtouch3m_status_t            st;
+    int                              ret = EXIT_FAILURE;
+    int                              i;
+    struct freq_noise_s              freq_pkpk_noise[N_FREQS];
+    struct freq_noise_s              freq_pkst_noise[N_FREQS];
+    microtouch3m_device_frequency_t  original_freq;
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
+
+    printf ("backing up original frequency...\n");
+    if ((st = microtouch3m_device_get_frequency (dev, &original_freq)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't get original frequency: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+    printf ("original frequency is: %s\n", microtouch3m_device_frequency_to_string (original_freq));
 
     for (i = 0; i < N_FREQS; i++) {
         uint64_t pkpk_noise;
@@ -816,6 +824,17 @@ run_frequency_check (microtouch3m_context_t *ctx,
     printf ("\nfrequency checks finished\n");
     frequency_check_results_print ("peak-to-peak noise measurements",  freq_pkpk_noise);
     frequency_check_results_print ("peak-to-stray noise measurements", freq_pkst_noise);
+
+    printf ("\nrecovering original frequency...\n");
+    if ((st = microtouch3m_device_set_frequency (dev, original_freq)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set original frequency: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+    if ((st = microtouch3m_device_reset (dev, MICROTOUCH3M_DEVICE_RESET_SOFT)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't soft reset controller: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+    printf ("finished\n");
 
     ret = EXIT_SUCCESS;
 
