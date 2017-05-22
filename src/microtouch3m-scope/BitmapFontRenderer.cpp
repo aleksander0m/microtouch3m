@@ -1,6 +1,9 @@
 #include <algorithm>
 #include "BitmapFontRenderer.hpp"
 
+/* Ignore ISO C++ warnings when including font xpm files */
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+
 #if 0
 
 #include "font_25x32.xpm"
@@ -20,6 +23,9 @@ const int BitmapFontRenderer::s_font_h = 16;
 #define FONT_NAME font_13x16_xpm
 
 #endif
+
+/* Recover ISO C++ warnings */
+#pragma GCC diagnostic warning "-Wwrite-strings"
 
 BitmapFontRenderer::BitmapFontRenderer()
 {
