@@ -1,0 +1,183 @@
+#ifndef MICROTOUCH_3M_SCOPE_GRAPH_HPP
+#define MICROTOUCH_3M_SCOPE_GRAPH_HPP
+
+#include <vector>
+
+#include "SDL.h"
+
+#include "SDLUtils.hpp"
+
+template<class T>
+class LineChart
+{
+public:
+
+    class Curve
+    {
+        friend class LineChart;
+
+    public:
+        Curve(const Color &color, typename std::vector<T>::size_type fill_count, T fill_value) :
+            color(color)
+        {
+            data.insert(data.begin(), fill_count, fill_value);
+        }
+
+        void set(typename std::vector<T>::size_type pos, T value)
+        {
+            data.at(pos) = value;
+        }
+
+        Color color;
+
+    private:
+        std::vector<T> data;
+    };
+
+    LineChart() : m_width(0), m_height(0), m_left(0), m_top(0), m_progress(0.0f)
+    {}
+
+    Curve &add_curve(const Color &color, typename std::vector<T>::size_type fill_count, T fill_value)
+    {
+        m_curves.push_back(Curve(color, fill_count, fill_value));
+
+        return m_curves.back();
+    }
+
+    Curve &curve(typename std::vector<Curve>::size_type i)
+    {
+        return m_curves.at(i);
+    }
+
+    void set_progress(float progress)
+    {
+        m_progress = progress;
+    }
+
+    void set_geometry(uint32_t left, uint32_t top, uint32_t width, uint32_t height)
+    {
+        m_left = left;
+        m_top = top;
+        m_width = width;
+        m_height = height;
+    }
+
+    void draw(SDL_Surface *surface)
+    {
+        if (!surface) return;
+
+        sdl_utils::set_clip_area(m_left, m_top, m_width, m_height);
+
+        for (typename std::vector<Curve>::iterator it = m_curves.begin(); it != m_curves.end(); ++it)
+        {
+            Curve &curve = *it;
+
+            if (curve.data.size() < 2)
+                continue;
+
+            float w_step = (float) m_width / (curve.data.size() - 1);
+
+            bool first = true;
+            int32_t px = 0, py = 0;
+
+            for (int i = 0; i < curve.data.size(); ++i)
+            {
+                const int y = curve.data.at(i);
+                const int x = w_step * i;
+
+                if (i == 0)
+                {
+                    px = x; py = y;
+                    continue;
+                }
+
+                sdl_utils::draw_line(surface,
+                                    px + m_left, m_top + m_height / 2 - py,
+                                    x + m_left, m_top + m_height / 2 - y,
+                                    curve.color);
+
+                px = x; py = y;
+            }
+        }
+
+        // border
+
+        const Color col_border(0xff, 0xff, 0x0);
+
+        sdl_utils::draw_line(surface,
+                            m_left, m_top,
+                            m_left + m_width, m_top,
+                            col_border);
+
+        sdl_utils::draw_line(surface,
+                            m_left + m_width, m_top,
+                            m_left + m_width, m_top + m_height,
+                            col_border);
+
+        sdl_utils::draw_line(surface,
+                            m_left + m_width, m_top + m_height,
+                            m_left, m_top + m_height,
+                            col_border);
+
+        sdl_utils::draw_line(surface,
+                            m_left, m_top + m_height,
+                            m_left, m_top,
+                            col_border);
+
+        // horizontal
+
+        const Color col_axis_x(0xff, 0xff, 0x0);
+
+        sdl_utils::draw_line(surface,
+                            m_left, m_top + m_height / 2,
+                            m_left + m_width, m_top + m_height / 2,
+                            col_axis_x);
+
+        for (int i = 1; i < 10; ++i)
+        {
+            const int x = m_left + i * m_width / 10;
+
+            sdl_utils::draw_line(surface,
+                                x, m_top + m_height / 2 - 5,
+                                x, m_top + m_height / 2 + 5,
+                                col_axis_x);
+        }
+
+        // vertical
+
+        const Color col_axis_y(0xaa, 0xff, 0xaa);
+
+        sdl_utils::draw_line(surface,
+                            (int32_t) (m_left + m_width * m_progress), m_top,
+                            (int32_t) (m_left + m_width * m_progress), m_top + m_height,
+                            col_axis_y);
+    }
+
+    int left() const
+    {
+        return m_left;
+    }
+
+    int top() const
+    {
+        return m_top;
+    }
+
+    uint32_t width() const
+    {
+        return m_width;
+    }
+
+    uint32_t height() const
+    {
+        return m_height;
+    }
+
+protected:
+    uint32_t m_width, m_height;
+    int m_left, m_top;
+    float m_progress;
+    std::vector<Curve> m_curves;
+};
+
+#endif // MICROTOUCH_3M_SCOPE_GRAPH_HPP
