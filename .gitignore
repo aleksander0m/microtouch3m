@@ -32,3 +32,5 @@ Makefile.in
 /src/libmicrotouch3m/microtouch3m.pc
 
 /src/microtouch3m-cli/microtouch3m-cli
+
+/src/microtouch3m-scope/microtouch3m-scope
