@@ -34,7 +34,8 @@ AC_SUBST(LIBUSB_CFLAGS)
 AC_SUBST(LIBUSB_LIBS)
 
 dnl libcheck required for unit test support
-PKG_CHECK_MODULES([CHECK], [check >= 0.9.4], [have_check=yes], [have_check=no])
+CHECK_REQUIRED_VERSION=0.9.4
+PKG_CHECK_MODULES([CHECK], [check >= $CHECK_REQUIRED_VERSION], [have_check=yes], [have_check=no])
 AM_CONDITIONAL(HAVE_CHECK, test "$have_check" = "yes")
 AC_SUBST(CHECK_CFLAGS)
 AC_SUBST(CHECK_LIBS)
