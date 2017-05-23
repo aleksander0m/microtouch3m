@@ -389,6 +389,34 @@ run_info (microtouch3m_context_t *ctx,
         printf ("\tfrequency:         %s\n", microtouch3m_device_frequency_to_string (freq));
     } while (0);
 
+    /* Linearization data */
+    printf ("linearization data:\n");
+    do {
+        struct microtouch3m_device_linearization_data_s data;
+        int                                             i;
+        int                                             j;
+
+        if (microtouch3m_device_get_linearization_data (dev, &data) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get linearization data: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+
+        printf ("\tX coefficients:\n");
+        for (i = 4; i >= 0; i--) {
+            printf ("\t\t");
+            for (j = 0; j < 5; j++) {
+                printf ("%3d%s", data.items[i][j].x_coef, j == 4 ? "\n" : " ");
+            }
+        }
+        printf ("\tY coefficients:\n");
+        for (i = 4; i >= 0; i--) {
+            printf ("\t\t");
+            for (j = 0; j < 5; j++) {
+                printf ("%3d%s", data.items[i][j].y_coef, j == 4 ? "\n" : " ");
+            }
+        }
+    } while (0);
+
     ret = EXIT_SUCCESS;
 
 out:
