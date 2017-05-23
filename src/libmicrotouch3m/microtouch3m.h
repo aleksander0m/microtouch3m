@@ -24,6 +24,10 @@
 #ifndef MICROTOUCH3M_H
 #define MICROTOUCH3M_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <pthread.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -679,5 +683,9 @@ typedef void (* microtouch3m_log_handler_t) (pthread_t   thread_id,
  * any other operation with the library.
  */
 void microtouch3m_log_set_handler (microtouch3m_log_handler_t handler);
+
+#ifdef __cplusplus
+} /* extern C */
+#endif
 
 #endif /* MICROTOUCH3M_H */
