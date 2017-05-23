@@ -232,7 +232,7 @@ run_validate_fw_file (const char *path)
 }
 
 /******************************************************************************/
-/* ACTION: info */
+/* ACTION: list */
 
 static int
 run_list (microtouch3m_context_t *ctx)
