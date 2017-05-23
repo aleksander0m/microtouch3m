@@ -7,7 +7,7 @@
 
 #include "SDL_net.h"
 
-#if defined(RDU1)
+#if defined(IMX51)
 #include <unistd.h>
 #include <fcntl.h>
 #endif
@@ -41,7 +41,7 @@ Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint
         SDLNet_Quit();
     }
 
-#if defined(RDU1)
+#if defined(IMX51)
     {
         const char * const file_path = "/sys/devices/platform/mxc_sdc_fb.0/graphics/fb0/pan";
 
@@ -68,7 +68,7 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
 {
     if ((m_title_update_time += delta_time) > 1000)
     {
-#if !defined(RAVE)
+#if !defined(IMX6) && !defined(IMX51)
         std::ostringstream oss;
 
         oss << "microtouch-3m-scope - " << screen_surface()->w << "x" << screen_surface()->h
