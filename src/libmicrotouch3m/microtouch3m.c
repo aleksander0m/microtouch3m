@@ -34,6 +34,11 @@
 #include <errno.h>
 #include <endian.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <libusb.h>
 
@@ -1224,6 +1229,122 @@ microtouch3m_device_set_linearization_data (microtouch3m_device_t               
                             (const uint8_t *) &internal_data,
                             sizeof (struct internal_linearization_data_s),
                             NULL);
+}
+
+/******************************************************************************/
+/* Linearization data files */
+
+/* Each byte is printed as 3 ASCII chars (2 hex ascii chars and a whitespace).
+ * And we have 50 bytes in the linearization data, so 150 */
+#define LINEARIZATION_FILE_SIZE 150
+
+microtouch3m_status_t
+microtouch3m_linearization_data_file_read (const char                                      *path,
+                                           struct microtouch3m_device_linearization_data_s *data)
+{
+    char                  buffer[LINEARIZATION_FILE_SIZE];
+    int                   fd;
+    ssize_t               n_read = 0;
+    int                   i, j;
+    microtouch3m_status_t st;
+
+    fd = open (path, O_RDONLY);
+    if (fd < 0) {
+        microtouch3m_log ("error: couldn't open file with linearization data: %s", strerror (errno));
+        st = MICROTOUCH3M_STATUS_FAILED;
+        goto out;
+    }
+
+    n_read = read (fd, buffer, LINEARIZATION_FILE_SIZE);
+    if (n_read <= 0) {
+        microtouch3m_log ("error: couldn't read linearization data file contents: %s", strerror (errno));
+        st = MICROTOUCH3M_STATUS_INVALID_IO;
+        goto out;
+    }
+
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            unsigned int val;
+            unsigned int idx;
+
+            idx = ((i * 5) + j) * 6;
+
+            if (isxdigit (buffer[idx]) &&
+                isxdigit (buffer[idx + 1]) &&
+                ((buffer[idx + 2]) == ' ') &&
+                (sscanf (&buffer[idx], "%x", &val) == 1) &&
+                val <= 0xff)
+                data->items[i][j].x_coef = (int8_t) (val & 0xFF);
+            else {
+                microtouch3m_log ("error: invalid linearization data detected at X[%d][%d]", i, j);
+                st = MICROTOUCH3M_STATUS_INVALID_FORMAT;
+                goto out;
+            }
+
+            idx += 3;
+
+            if (isxdigit (buffer[idx]) &&
+                isxdigit (buffer[idx + 1]) &&
+                ((buffer[idx + 2]) == ' ') &&
+                (sscanf (&buffer[idx], "%x", &val) == 1) &&
+                val <= 0xff)
+                data->items[i][j].y_coef = (int8_t) (val & 0xFF);
+            else {
+                microtouch3m_log ("error: invalid linearization data detected at Y[%d][%d]", i, j);
+                st = MICROTOUCH3M_STATUS_INVALID_FORMAT;
+                goto out;
+            }
+        }
+    }
+
+    st = MICROTOUCH3M_STATUS_OK;
+
+out:
+    if (!(fd < 0))
+        close (fd);
+
+    return st;
+}
+
+microtouch3m_status_t
+microtouch3m_linearization_data_file_write (const char                                            *path,
+                                            const struct microtouch3m_device_linearization_data_s *data)
+{
+    /* We need +1 as snprintf() appends always a NUL byte */
+    char                  buffer[LINEARIZATION_FILE_SIZE+1];
+    int                   fd;
+    int                   i, j;
+    microtouch3m_status_t st;
+
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            unsigned int idx;
+
+            idx = ((i * 5) + j) * 6;
+            snprintf (&buffer[idx], 7, "%02X %02X ", (uint8_t) data->items[i][j].x_coef, (uint8_t) data->items[i][j].y_coef);
+        }
+    }
+
+    fd = open (path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+        microtouch3m_log ("error: couldn't open output file to write: %s", strerror (errno));
+        st = MICROTOUCH3M_STATUS_FAILED;
+        goto out;
+    }
+
+    if (write (fd, buffer, LINEARIZATION_FILE_SIZE) < 0) {
+        microtouch3m_log ("error: couldn't write to output file: %s", strerror (errno));
+        st = MICROTOUCH3M_STATUS_INVALID_IO;
+        goto out;
+    }
+
+    st = MICROTOUCH3M_STATUS_OK;
+
+out:
+    if (!(fd < 0))
+        close (fd);
+
+    return st;
 }
 
 /******************************************************************************/

@@ -503,6 +503,34 @@ microtouch3m_status_t microtouch3m_device_get_linearization_data (microtouch3m_d
  */
 microtouch3m_status_t microtouch3m_device_set_linearization_data (microtouch3m_device_t                                 *dev,
                                                                   const struct microtouch3m_device_linearization_data_s *data);
+
+/******************************************************************************/
+/* Linearization data files */
+
+/**
+ * microtouch3m_linearization_data_file_read:
+ * @path: local path to a linearization data file.
+ * @data: output location to store the linearization data.
+ *
+ * Validate the input linearization data file and optionally also load it into memory.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_linearization_data_file_read (const char                                      *path,
+                                                                 struct microtouch3m_device_linearization_data_s *data);
+
+/**
+ * microtouch3m_linearization_data_file_write:
+ * @path: local path to the destination linearization data file.
+ * @data: the linearization data.
+ *
+ * Write the linearization data into a file.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_linearization_data_file_write (const char                                            *path,
+                                                                  const struct microtouch3m_device_linearization_data_s *data);
+
 /******************************************************************************/
 /* Read strays */
 
