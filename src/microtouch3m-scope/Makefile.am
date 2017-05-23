@@ -15,6 +15,7 @@ microtouch3m_scope_SOURCES = \
 microtouch3m_scope_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_builddir) \
+	-I$(top_srcdir)/src/libmicrotouch3m \
 	$(SDL_CFLAGS) \
 	$(SDLNET_CFLAGS) \
 	$(SDLIMAGE_CFLAGS) \
@@ -22,6 +23,7 @@ microtouch3m_scope_CPPFLAGS = \
 
 microtouch3m_scope_LDADD = \
 	-lpthread -lm \
+	$(top_builddir)/src/libmicrotouch3m/libmicrotouch3m.la \
 	$(SDLIMAGE_LIBS) \
 	$(SDLNET_LIBS) \
 	$(SDL_LIBS) \
