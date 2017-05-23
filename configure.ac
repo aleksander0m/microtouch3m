@@ -95,6 +95,7 @@ echo "
     Build:
       compiler:             ${CC}
       cflags:               ${CFLAGS}
+      cxxflags:             ${CXXFLAGS}
       ldflags:              ${LDFLAGS}
       maintainer mode:      ${USE_MAINTAINER_MODE}
       unit tests:           ${have_check}
