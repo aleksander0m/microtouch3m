@@ -29,6 +29,7 @@ Makefile.in
 /m4/ltversion.m4
 /m4/lt~obsolete.m4
 
+/src/libmicrotouch3m/microtouch3m.h
 /src/libmicrotouch3m/microtouch3m.pc
 
 /src/microtouch3m-cli/microtouch3m-cli

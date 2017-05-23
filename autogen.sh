@@ -7,7 +7,7 @@ REQUIRED_AUTOMAKE_VERSION=1.9
 PKG_NAME=microtouch3m
 
 (test -f $srcdir/configure.ac \
-  && test -f $srcdir/src/libmicrotouch3m/microtouch3m.h) || {
+  && test -f $srcdir/src/libmicrotouch3m/microtouch3m.h.in) || {
     echo -n "**Error**: Directory "\`$srcdir\'" does not look like the"
     echo " top-level $PKG_NAME directory"
     exit 1

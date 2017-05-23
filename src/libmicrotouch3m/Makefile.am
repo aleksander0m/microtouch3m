@@ -30,5 +30,9 @@ include_HEADERS = \
 	microtouch3m.h \
 	$(NULL)
 
+EXTRA_DIST = \
+	microtouch3m.h.in \
+	$(NULL)
+
 pkgconfigdir   = $(libdir)/pkgconfig
 pkgconfig_DATA = microtouch3m.pc

@@ -1,7 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.68])
 
-AC_INIT([microtouch3m], [0.29.0], [aleksander@aleksander.es])
+dnl The microtouch3m version number
+m4_define([microtouch3m_major_version], [0])
+m4_define([microtouch3m_minor_version], [29])
+m4_define([microtouch3m_micro_version], [0])
+m4_define([microtouch3m_version],
+          [microtouch3m_major_version.microtouch3m_minor_version.microtouch3m_micro_version])
+
+AC_INIT([microtouch3m], [microtouch3m_version], [aleksander@aleksander.es])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -28,6 +35,16 @@ LT_INIT
 
 dnl Specific warnings to always use
 MICROTOUCH3M_COMPILER_WARNINGS
+
+dnl Version stuff
+MICROTOUCH3M_MAJOR_VERSION=microtouch3m_major_version
+MICROTOUCH3M_MINOR_VERSION=microtouch3m_minor_version
+MICROTOUCH3M_MICRO_VERSION=microtouch3m_micro_version
+MICROTOUCH3M_VERSION=microtouch3m_version
+AC_SUBST(MICROTOUCH3M_MAJOR_VERSION)
+AC_SUBST(MICROTOUCH3M_MINOR_VERSION)
+AC_SUBST(MICROTOUCH3M_MICRO_VERSION)
+AC_SUBST(MICROTOUCH3M_VERSION)
 
 dnl Require libusb
 LIBUSB_REQUIRED_VERSION=1.0.16
@@ -83,6 +100,7 @@ AC_CONFIG_FILES([Makefile
                  src/common/Makefile
                  src/libmicrotouch3m/Makefile
                  src/libmicrotouch3m/microtouch3m.pc
+                 src/libmicrotouch3m/microtouch3m.h
                  src/libmicrotouch3m/libGIS/Makefile
                  src/microtouch3m-cli/Makefile
                  src/microtouch3m-scope/Makefile])

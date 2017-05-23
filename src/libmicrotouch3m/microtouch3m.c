@@ -1892,3 +1892,24 @@ out:
 
     return status;
 }
+
+/******************************************************************************/
+/* Library version info */
+
+unsigned int
+microtouch3m_get_major_version (void)
+{
+    return MICROTOUCH3M_MAJOR_VERSION;
+}
+
+unsigned int
+microtouch3m_get_minor_version (void)
+{
+    return MICROTOUCH3M_MINOR_VERSION;
+}
+
+unsigned int
+microtouch3m_get_micro_version (void)
+{
+    return MICROTOUCH3M_MICRO_VERSION;
+}
