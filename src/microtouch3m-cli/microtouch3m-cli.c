@@ -274,6 +274,28 @@ out:
 /******************************************************************************/
 /* ACTION: info */
 
+static void
+print_linearization_data (const char                                      *prefix,
+                          struct microtouch3m_device_linearization_data_s *data)
+{
+    int i, j;
+
+    printf ("%sX coefficients:\n", prefix);
+    for (i = 4; i >= 0; i--) {
+        printf ("%s\t", prefix);
+        for (j = 0; j < 5; j++) {
+            printf ("%3d%s", data->items[i][j].x_coef, j == 4 ? "\n" : " ");
+        }
+    }
+    printf ("%sY coefficients:\n", prefix);
+    for (i = 4; i >= 0; i--) {
+        printf ("%s\t", prefix);
+        for (j = 0; j < 5; j++) {
+            printf ("%3d%s", data->items[i][j].y_coef, j == 4 ? "\n" : " ");
+        }
+    }
+}
+
 static int
 run_info (microtouch3m_context_t *ctx,
           bool                    first,
@@ -393,28 +415,14 @@ run_info (microtouch3m_context_t *ctx,
     printf ("linearization data:\n");
     do {
         struct microtouch3m_device_linearization_data_s data;
-        int                                             i;
-        int                                             j;
 
         if (microtouch3m_device_get_linearization_data (dev, &data) != MICROTOUCH3M_STATUS_OK) {
             fprintf (stderr, "error: couldn't get linearization data: %s\n", microtouch3m_status_to_string (st));
             break;
         }
 
-        printf ("\tX coefficients:\n");
-        for (i = 4; i >= 0; i--) {
-            printf ("\t\t");
-            for (j = 0; j < 5; j++) {
-                printf ("%3d%s", data.items[i][j].x_coef, j == 4 ? "\n" : " ");
-            }
-        }
-        printf ("\tY coefficients:\n");
-        for (i = 4; i >= 0; i--) {
-            printf ("\t\t");
-            for (j = 0; j < 5; j++) {
-                printf ("%3d%s", data.items[i][j].y_coef, j == 4 ? "\n" : " ");
-            }
-        }
+        print_linearization_data ("\t", &data);
+
     } while (0);
 
     ret = EXIT_SUCCESS;
@@ -869,6 +877,89 @@ run_frequency_check (microtouch3m_context_t *ctx,
 out:
     if (dev)
         microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: linearization data load */
+
+static int
+run_linearization_data_load (microtouch3m_context_t *ctx,
+                             bool                    first,
+                             uint8_t                 bus_number,
+                             uint8_t                 device_address,
+                             const char             *path)
+{
+    microtouch3m_status_t                            st;
+    microtouch3m_device_t                           *dev;
+    int                                              ret = EXIT_FAILURE;
+    struct microtouch3m_device_linearization_data_s  data;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+
+    if ((st = microtouch3m_linearization_data_file_read (path, &data)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't load linearization data file: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("linearization data loaded from file...\n");
+    print_linearization_data ("", &data);
+
+    if ((st = microtouch3m_device_set_linearization_data (dev, &data)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set linearization data into device: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("successfully loaded linearization data in device\n");
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: linearization data save */
+
+static int
+run_linearization_data_save (microtouch3m_context_t *ctx,
+                             bool                    first,
+                             uint8_t                 bus_number,
+                             uint8_t                 device_address,
+                             const char             *path)
+{
+    microtouch3m_status_t                            st;
+    microtouch3m_device_t                           *dev;
+    int                                              ret = EXIT_FAILURE;
+    struct microtouch3m_device_linearization_data_s  data;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_get_linearization_data (dev, &data)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't load linearization data from device: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("linearization data loaded from device...\n");
+    print_linearization_data ("", &data);
+
+    if ((st = microtouch3m_linearization_data_file_write (path, &data)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't save linearization data file: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("successfully saved linearization data to file\n");
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+
     return ret;
 }
 
@@ -1397,39 +1488,43 @@ print_help (void)
             "Usage: " PROGRAM_NAME " <option>\n"
             "\n"
             "Device discovery options\n"
-            "  -n, --list                         List all devices found..\n"
+            "  -n, --list                             List all devices found..\n"
             "\n"
             "Generic device selection options\n"
-            "  -s, --bus-dev=[BUS]:[DEV]          Select device by bus and/or device number.\n"
-            "  -f, --first                        Select first device found.\n"
+            "  -s, --bus-dev=[BUS]:[DEV]              Select device by bus and/or device number.\n"
+            "  -f, --first                            Select first device found.\n"
             "\n"
             "Common device actions:\n"
-            "  -i, --info                         Show device information.\n"
-            "  -l, --set-sensitivity-level=[LVL]  Set sensitivity level (See Notes).\n"
-            "  -r, --set-frequency=[FREQ]         Set frequency (See Notes).\n"
+            "  -i, --info                             Show device information.\n"
+            "  -l, --set-sensitivity-level=[LVL]      Set sensitivity level (See Notes).\n"
+            "  -r, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
             "\n"
             "Frequency check device actions:\n"
-            "  -F, --frequency-check              Run frequency check mode.\n"
+            "  -F, --frequency-check                  Run frequency check mode.\n"
+            "\n"
+            "Linearization data actions:\n"
+            "  -P, --linearization-data-load=[PATH]   Load linearization data from a .bk2 file.\n"
+            "  -Q, --linearization-data-save=[PATH]   Save linearization data to a .bk2 file.\n"
             "\n"
             "Scope device actions:\n"
-            "  -S, --scope                        Run scope mode.\n"
-            "  -O, --scope-file=[PATH]            Store the scope results in an output file.\n"
-            "  -C, --scope-stray-correction       Perform stray correction during the scope operation.\n"
-            "  -T, --scope-scale-thousands        Scale the values by 1000.\n"
+            "  -S, --scope                            Run scope mode.\n"
+            "  -O, --scope-file=[PATH]                Store the scope results in an output file.\n"
+            "  -C, --scope-stray-correction           Perform stray correction during the scope operation.\n"
+            "  -T, --scope-scale-thousands            Scale the values by 1000.\n"
             "\n"
             "Firmware device actions:\n"
-            "  -x, --firmware-dump=[PATH]         Dump firmware to a file.\n"
-            "  -u, --firmware-update=[PATH]       Update firmware in the device (See Notes).\n"
-            "  -N, --skip-removing-data-backup    Don't remove data backup on firmware update success.\n"
-            "  -B, --restore-data-backup=[PATH]   Restore the given device data (See Notes).\n"
+            "  -x, --firmware-dump=[PATH]             Dump firmware to a file.\n"
+            "  -u, --firmware-update=[PATH]           Update firmware in the device (See Notes).\n"
+            "  -N, --skip-removing-data-backup        Don't remove data backup on firmware update success.\n"
+            "  -B, --restore-data-backup=[PATH]       Restore the given device data (See Notes).\n"
             "\n"
             "Firmware file actions:\n"
-            "  -z, --validate-fw-file=[PATH]      Validate firmware file.\n"
+            "  -z, --validate-fw-file=[PATH]          Validate firmware file.\n"
             "\n"
             "Common options:\n"
-            "  -d, --debug                        Enable verbose logging.\n"
-            "  -h, --help                         Show help.\n"
-            "  -v, --version                      Show version.\n"
+            "  -d, --debug                            Enable verbose logging.\n"
+            "  -h, --help                             Show help.\n"
+            "  -v, --version                          Show version.\n"
             "\n"
             "Notes:\n"
             "  * The --firmware-update action will perform a controller reboot automatically.\n"
@@ -1510,6 +1605,8 @@ int main (int argc, char **argv)
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
     bool                    frequency_check           = false;
+    char                   *linearization_data_load   = NULL;
+    char                   *linearization_data_save   = NULL;
     bool                    scope                     = false;
     char                   *scope_file                = NULL;
     bool                    scope_stray_correction    = false;
@@ -1530,6 +1627,8 @@ int main (int argc, char **argv)
         { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "set-frequency",             required_argument, 0, 'r' },
         { "frequency-check",           no_argument,       0, 'F' },
+        { "linearization-data-load",   required_argument, 0, 'P' },
+        { "linearization-data-save",   required_argument, 0, 'Q' },
         { "scope",                     no_argument,       0, 'S' },
         { "scope-file",                required_argument, 0, 'O' },
         { "scope-stray-correction",    no_argument,       0, 'C' },
@@ -1548,7 +1647,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fil:r:FSO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fil:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1570,6 +1669,12 @@ int main (int argc, char **argv)
             break;
         case 'F':
             frequency_check = true;
+            break;
+        case 'P':
+            linearization_data_load = strdup (optarg);
+            break;
+        case 'Q':
+            linearization_data_save = strdup (optarg);
             break;
         case 'S':
             scope = true;
@@ -1634,6 +1739,8 @@ int main (int argc, char **argv)
         !!set_sensitivity_level +
         !!set_frequency +
         frequency_check +
+        !!linearization_data_load +
+        !!linearization_data_save +
         scope +
         !!firmware_dump +
         !!(!!firmware_update + !!restore_data_backup);
@@ -1712,6 +1819,10 @@ int main (int argc, char **argv)
         ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
     else if (frequency_check)
         ret = run_frequency_check (ctx, first, bus_number, device_address);
+    else if (linearization_data_load)
+        ret = run_linearization_data_load (ctx, first, bus_number, device_address, linearization_data_load);
+    else if (linearization_data_save)
+        ret = run_linearization_data_save (ctx, first, bus_number, device_address, linearization_data_save);
     else if (firmware_dump)
         ret = run_firmware_dump (ctx, first, bus_number, device_address, firmware_dump);
     else if (firmware_update || restore_data_backup)
@@ -1723,6 +1834,8 @@ out:
     if (ctx)
         microtouch3m_context_unref (ctx);
 
+    free (linearization_data_load);
+    free (linearization_data_save);
     free (scope_file);
     free (bus_number_device_address);
     free (firmware_dump);
