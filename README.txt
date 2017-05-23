@@ -10,7 +10,7 @@ Cross compiling for iMX51:
    $ ./configure                                                            \
          --host=armv7l-ims-linux-gnueabi                                    \
          --prefix=/opt/timesys/i_MX51/toolchain/                            \
-	 PKG_CONFIG_PATH=/opt/timesys/i_MX51/toolchain/lib/pkgconfig        \
+         PKG_CONFIG_PATH=/opt/timesys/i_MX51/toolchain/lib/pkgconfig        \
          CC=/opt/timesys/i_MX51/toolchain/bin/armv7l-ims-linux-gnueabi-gcc  \
          CXX=/opt/timesys/i_MX51/toolchain/bin/armv7l-ims-linux-gnueabi-g++ \
          CXXFLAGS="-DIMX51"
@@ -22,7 +22,7 @@ Cross compiling for iMX6:
    $ ./configure                                                           \
          --host=armv7l-ims-linux-gnueabi                                   \
          --prefix=/opt/timesys/i_MX6/toolchain/                            \
-	 PKG_CONFIG_PATH=/opt/timesys/i_MX6/toolchain/lib/pkgconfig        \
+         PKG_CONFIG_PATH=/opt/timesys/i_MX6/toolchain/lib/pkgconfig        \
          CC=/opt/timesys/i_MX6/toolchain/bin/armv7l-ims-linux-gnueabi-gcc  \
          CXX=/opt/timesys/i_MX6/toolchain/bin/armv7l-ims-linux-gnueabi-g++ \
          CXXFLAGS="-DIMX6"
