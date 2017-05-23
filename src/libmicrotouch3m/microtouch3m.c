@@ -1152,6 +1152,81 @@ microtouch3m_read_strays (microtouch3m_device_t *dev,
 }
 
 /******************************************************************************/
+/* Linearization data */
+
+/* In the USB messages we want it to be represented as an array of 16bit values,
+ * where each value is composed of both X and Y components. We want this because
+ * we want to explicitly do LE->HE conversion. */
+struct internal_linearization_data_s {
+    uint16_t items[5][5];
+} __attribute__((packed));
+
+#define LINEARIZATION_DATA_BLOCK  2
+struct parameter_report_linearization_data_s {
+    struct parameter_report_s            header;
+    struct internal_linearization_data_s data;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_linearization_data (microtouch3m_device_t                           *dev,
+                                            struct microtouch3m_device_linearization_data_s *data)
+{
+    struct parameter_report_linearization_data_s parameter_report;
+    microtouch3m_status_t                        st;
+    int                                          i, j;
+
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_NOVRAM,
+                                        (LINEARIZATION_DATA_BLOCK << 8),
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log_buffer ("linearization data retrieved", (const uint8_t *)&(parameter_report.data), sizeof (struct internal_linearization_data_s));
+
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            uint16_t val;
+
+            val = le16toh (parameter_report.data.items[i][j]);
+            data->items[i][j].x_coef = val >> 8;
+            data->items[i][j].y_coef = val & 0xff;
+        }
+    }
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+microtouch3m_status_t
+microtouch3m_device_set_linearization_data (microtouch3m_device_t                                 *dev,
+                                            const struct microtouch3m_device_linearization_data_s *data)
+{
+    struct internal_linearization_data_s internal_data;
+    int                                  i, j;
+
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            uint16_t val;
+
+            val = (((uint8_t) data->items[i][j].x_coef) << 8) | ((uint8_t)data->items[i][j].y_coef);
+            internal_data.items[i][j] = htole16 (val);
+        }
+    }
+
+    microtouch3m_log_buffer ("setting linearization data...", (const uint8_t *)&internal_data, sizeof (struct internal_linearization_data_s));
+
+    return run_out_request (dev,
+                            REQUEST_SET_PARAMETER_BLOCK,
+                            PARAMETER_ID_CONTROLLER_NOVRAM,
+                            (LINEARIZATION_DATA_BLOCK << 8),
+                            (const uint8_t *) &internal_data,
+                            sizeof (struct internal_linearization_data_s),
+                            NULL);
+}
+
+/******************************************************************************/
 /* Device async report operation */
 
 #define MAX_INTERRUPT_ENDPOINT_TRANSFER 32
@@ -1426,13 +1501,6 @@ struct parameter_report_calibration_data_s {
     uint8_t                   data [CALIBRATION_DATA_SIZE];
 } __attribute__((packed));
 
-#define LINEARIZATION_DATA_BLOCK  2
-#define LINEARIZATION_DATA_SIZE  50
-struct parameter_report_linearization_data_s {
-    struct parameter_report_s header;
-    uint8_t                   data [LINEARIZATION_DATA_SIZE];
-} __attribute__((packed));
-
 #define ORIENTATION_PARAMETER_NUMBER 1
 #define ORIENTATION_DATA_SIZE        2
 struct parameter_report_orientation_data_s {
@@ -1448,8 +1516,8 @@ struct parameter_report_identifier_data_s {
 } __attribute__((packed));
 
 struct microtouch3m_device_data_s {
+    struct microtouch3m_device_linearization_data_s linearization_data;
     uint8_t calibration_data   [CALIBRATION_DATA_SIZE];
-    uint8_t linearization_data [LINEARIZATION_DATA_SIZE];
     uint8_t orientation_data   [ORIENTATION_DATA_SIZE];
     uint8_t identifier_data    [IDENTIFIER_DATA_SIZE];
 };
@@ -1493,21 +1561,9 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     }
 
     microtouch3m_log ("backing up linearization data...");
-    {
-        struct parameter_report_linearization_data_s parameter_report;
-
-        if ((st = run_parameter_in_request (dev,
-                                            REQUEST_GET_PARAMETER_BLOCK,
-                                            PARAMETER_ID_CONTROLLER_NOVRAM,
-                                            (LINEARIZATION_DATA_BLOCK << 8),
-                                            (struct parameter_report_s *) &parameter_report,
-                                            sizeof (parameter_report),
-                                            NULL)) != MICROTOUCH3M_STATUS_OK)
-            goto out;
-
-        memcpy (data->linearization_data, parameter_report.data, LINEARIZATION_DATA_SIZE);
-        microtouch3m_log_buffer ("linearization data backed up", data->linearization_data, LINEARIZATION_DATA_SIZE);
-    }
+    if ((st = microtouch3m_device_get_linearization_data (dev, &data->linearization_data)) != MICROTOUCH3M_STATUS_OK)
+        goto out;
+    microtouch3m_log_buffer ("linearization data backed up", (const uint8_t *) &(data->linearization_data), sizeof (data->linearization_data));
 
     microtouch3m_log ("backing up orientation data...");
     {
@@ -1578,13 +1634,8 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
         return st;
 
     microtouch3m_log ("restoring linearization data...");
-    if ((st = run_out_request (dev,
-                               REQUEST_SET_PARAMETER_BLOCK,
-                               PARAMETER_ID_CONTROLLER_NOVRAM,
-                               (LINEARIZATION_DATA_BLOCK << 8),
-                               data->linearization_data,
-                               LINEARIZATION_DATA_SIZE,
-                               NULL)) != MICROTOUCH3M_STATUS_OK)
+
+    if ((st = microtouch3m_device_set_linearization_data (dev, &data->linearization_data)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     microtouch3m_log ("restoring orientation data...");

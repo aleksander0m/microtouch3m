@@ -440,6 +440,69 @@ microtouch3m_status_t microtouch3m_device_get_frequency (microtouch3m_device_t  
 microtouch3m_status_t microtouch3m_device_set_frequency (microtouch3m_device_t           *dev,
                                                          microtouch3m_device_frequency_t  freq);
 
+
+/******************************************************************************/
+/* Controller linearization data */
+
+/**
+ * microtouch3m_device_linearization_data_item_s:
+ * @y_coef: Y coefficient.
+ * @x_coef: X coefficient.
+ *
+ * A single linearization data item.
+ */
+struct microtouch3m_device_linearization_data_item_s {
+    int8_t x_coef;
+    int8_t y_coef;
+} __attribute__((packed));
+
+/**
+ * microtouch3m_device_linearization_data_s:
+ * @items: 5x5 array of linearization data items.
+ *
+ * The linearization data of the device.
+ *
+ * The array item dimensions [i][j] are usually visualized as follows:
+ *
+ *     [4,0] [4,1] [4,2] [4,3] [4,4]
+ *     [3,0] [3,1] [3,2] [3,3] [3,4]
+ *     [2,0] [2,1] [2,2] [2,3] [2,4]
+ *     [1,0] [1,1] [1,2] [1,3] [1,4]
+ *     [0,0] [0,1] [0,2] [0,3] [0,4]
+ *
+ * i.e.:
+ *     items[4][0] is the UL corner.
+ *     items[4][4] is the UR corner
+ *     items[0][0] is the LL corner
+ *     items[0][4] is the LR corner
+ */
+struct microtouch3m_device_linearization_data_s {
+    struct microtouch3m_device_linearization_data_item_s items[5][5];
+} __attribute__((packed));
+
+/**
+ * microtouch3m_device_get_linearization_data:
+ * @dev: a #microtouch3m_device_t.
+ * @data: output location to store the linearization data.
+ *
+ * Get the linearization data from the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_linearization_data (microtouch3m_device_t                           *dev,
+                                                                  struct microtouch3m_device_linearization_data_s *data);
+
+/**
+ * microtouch3m_device_set_linearization_data:
+ * @dev: a #microtouch3m_device_t.
+ * @data: the linearization data.
+ *
+ * Update the linearization data settings in the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_linearization_data (microtouch3m_device_t                                 *dev,
+                                                                  const struct microtouch3m_device_linearization_data_s *data);
 /******************************************************************************/
 /* Read strays */
 
