@@ -387,6 +387,19 @@ run_info (microtouch3m_context_t *ctx,
     /* Now several settings */
     printf ("settings:\n");
 
+    /* Device identifier */
+    do {
+        struct microtouch3m_device_identifier_s identifier;
+
+        if ((st = microtouch3m_device_get_identifier (dev, &identifier)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get identifier: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+
+        printf ("\tidentifier:        %02x:%02x:%02x:%02x\n",
+                identifier.id[0], identifier.id[1], identifier.id[2], identifier.id[3]);
+    } while (0);
+
     /* Sensitivity level */
     do {
         uint8_t level;
@@ -425,6 +438,43 @@ run_info (microtouch3m_context_t *ctx,
 
     } while (0);
 
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: set identifier */
+
+static int
+run_set_identifier (microtouch3m_context_t *ctx,
+                    bool                    first,
+                    uint8_t                 bus_number,
+                    uint8_t                 device_address,
+                    uint8_t                 id0,
+                    uint8_t                 id1,
+                    uint8_t                 id2,
+                    uint8_t                 id3)
+{
+    microtouch3m_device_t                   *dev;
+    microtouch3m_status_t                    st;
+    int                                      ret = EXIT_FAILURE;
+    struct microtouch3m_device_identifier_s  identifier = {
+        .id = { id0, id1, id2, id3 }
+    };
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_set_identifier (dev, &identifier)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set identifier: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("successfully set identifier to: %02x:%02x:%02x:%02x\n", id0, id1, id2, id3);
     ret = EXIT_SUCCESS;
 
 out:
@@ -1496,6 +1546,7 @@ print_help (void)
             "\n"
             "Common device actions:\n"
             "  -i, --info                             Show device information.\n"
+            "  -I, --set-identifier=[HH:HH:HH:HH]     Set the 4 byte identifier.\n"
             "  -l, --set-sensitivity-level=[LVL]      Set sensitivity level (See Notes).\n"
             "  -r, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
             "\n"
@@ -1602,6 +1653,7 @@ int main (int argc, char **argv)
     uint8_t                 device_address            = 0;
     bool                    first                     = false;
     bool                    info                      = false;
+    char                   *set_identifier            = NULL;
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
     bool                    frequency_check           = false;
@@ -1624,6 +1676,7 @@ int main (int argc, char **argv)
         { "bus-dev",                   required_argument, 0, 's' },
         { "first",                     no_argument,       0, 'f' },
         { "info",                      no_argument,       0, 'i' },
+        { "set-identifier",            required_argument, 0, 'I' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "set-frequency",             required_argument, 0, 'r' },
         { "frequency-check",           no_argument,       0, 'F' },
@@ -1647,7 +1700,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fil:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fiI:l:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1660,6 +1713,9 @@ int main (int argc, char **argv)
             break;
         case 'i':
             info = true;
+            break;
+        case 'I':
+            set_identifier = strdup (optarg);
             break;
         case 'l':
             set_sensitivity_level = strdup (optarg);
@@ -1736,6 +1792,7 @@ int main (int argc, char **argv)
     /* Track actions */
     n_actions_require_device =
         info +
+        !!set_identifier +
         !!set_sensitivity_level +
         !!set_frequency +
         frequency_check +
@@ -1795,7 +1852,16 @@ int main (int argc, char **argv)
         ret = run_list (ctx);
     else if (info)
         ret = run_info (ctx, first, bus_number, device_address);
-    else if (set_sensitivity_level) {
+    else if (set_identifier) {
+        unsigned int aux0, aux1, aux2, aux3;
+
+        if ((sscanf (set_identifier, "%x:%x:%x:%x", &aux0, &aux1, &aux2, &aux3) != 4) ||
+            (aux0 > 0xff || aux1 > 0xff || aux2 > 0xff || aux3 > 0xff)) {
+            fprintf (stderr, "error: invalid --set-identifier value given: %s\n", set_identifier);
+            goto out;
+        }
+        ret = run_set_identifier (ctx, first, bus_number, device_address, (uint8_t) aux0, (uint8_t) aux1, (uint8_t) aux2, (uint8_t) aux3);
+    } else if (set_sensitivity_level) {
         unsigned long aux;
 
         errno = 0;
@@ -1843,5 +1909,6 @@ out:
     free (restore_data_backup);
     free (validate_fw_file);
     free (set_sensitivity_level);
+    free (set_identifier);
     return ret;
 }
