@@ -1,16 +1,14 @@
 #include "Microtouch3MScopeApp.hpp"
 
 #include <sstream>
-#include <iostream>
 #include <cmath>
 #include <cstring>
 
-#include "SDL_net.h"
-
 #if defined(IMX51)
-#include <unistd.h>
 #include <fcntl.h>
 #endif
+
+#include "SDL_net.h"
 
 Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_limit) :
     SDLApp(width, height, flags, fps_limit),
@@ -18,7 +16,8 @@ Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint
     m_current_pos(0),
     m_title_update_time(0),
     m_chart_mode(CHART_MODE_ONE),
-    m_net_text("")
+    m_net_text(""),
+    m_scale_target(10000000)
 {
     create_charts();
 
@@ -59,9 +58,13 @@ Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint
     }
 #endif
 
-    m_m3m_dev.open();
-    m_m3m_dev.print_info();
-    m_m3m_dev.read_strays();
+//    {
+//        M3MDevice m3m_dev;
+//        m3m_dev.print_info();
+//        std::cout << std::endl;
+//    }
+
+    m_m3m_dev_mon_thread.start();
 }
 
 Microtouch3MScopeApp::~Microtouch3MScopeApp()
@@ -88,54 +91,62 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
 
     // update charts
 
-    m_m3m_dev.test_async();
+    M3MDeviceMonitorThread::signal_t sig;
 
-    const double scale = (screen_surface()->h / 2 - 10) / 5000000.0;
-
-    int val0 = (int) (m_m3m_dev.ul_corrected_signal() * scale);
-    int val1 = (int) (m_m3m_dev.ur_corrected_signal() * scale);
-    int val2 = (int) (m_m3m_dev.ll_corrected_signal() * scale);
-    int val3 = (int) (m_m3m_dev.lr_corrected_signal() * scale);
-
-    switch (m_chart_mode)
+    while (m_m3m_dev_mon_thread.pop_signal(sig))
     {
-        case CHART_MODE_ONE:
+        const double scale = (double) (screen_surface()->h / 2 - 10) / m_scale_target;
+
+        int val0 = (int) (sig.ul_corrected_signal * scale);
+        int val1 = (int) (sig.ur_corrected_signal * scale);
+        int val2 = (int) (sig.ll_corrected_signal * scale);
+        int val3 = (int) (sig.lr_corrected_signal * scale);
+
+//        int val0 = (int) (sin(SDL_GetTicks() * 0.01) * 100 - 190);
+//        int val1 = (int) (cos(SDL_GetTicks() * 0.05) * 50 + 50);
+//        int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
+//        int val3 = (int) (m_current_pos % 30 - 100);
+
+        switch (m_chart_mode)
         {
-            if (m_charts.size() == 1)
+            case CHART_MODE_ONE:
             {
-                uint32_t pos = (uint32_t) (m_current_pos % m_sample_count);
+                if (m_charts.size() == 1)
+                {
+                    uint32_t pos = (uint32_t) (m_current_pos % m_sample_count);
 
-                LineChart<int> &chart = m_charts.at(0);
+                    LineChart<int> &chart = m_charts.at(0);
 
-                chart.curve(0).set(pos, val0);
-                chart.curve(1).set(pos, val1);
-                chart.curve(2).set(pos, val2);
-                chart.curve(3).set(pos, val3);
+                    chart.curve(0).set(pos, val0);
+                    chart.curve(1).set(pos, val1);
+                    chart.curve(2).set(pos, val2);
+                    chart.curve(3).set(pos, val3);
+                }
             }
-        }
-            break;
+                break;
 
-        case CHART_MODE_FOUR:
-        {
-            if (m_charts.size() == 4)
+            case CHART_MODE_FOUR:
             {
-                uint32_t pos = (uint32_t) (m_current_pos % m_sample_count);
+                if (m_charts.size() == 4)
+                {
+                    uint32_t pos = (uint32_t) (m_current_pos % m_sample_count);
 
-                m_charts.at(0).curve(0).set(pos, val0);
-                m_charts.at(1).curve(0).set(pos, val1);
-                m_charts.at(2).curve(0).set(pos, val2);
-                m_charts.at(3).curve(0).set(pos, val3);
+                    m_charts.at(0).curve(0).set(pos, val0);
+                    m_charts.at(1).curve(0).set(pos, val1);
+                    m_charts.at(2).curve(0).set(pos, val2);
+                    m_charts.at(3).curve(0).set(pos, val3);
+                }
             }
+                break;
         }
-            break;
+
+        ++m_current_pos;
     }
 
     for (std::vector<LineChart<int> >::iterator it = m_charts.begin(); it != m_charts.end(); ++it)
     {
         it->set_progress((float) (m_current_pos % m_sample_count) / m_sample_count);
     }
-
-    ++m_current_pos;
 }
 
 void Microtouch3MScopeApp::draw()
@@ -169,6 +180,11 @@ void Microtouch3MScopeApp::draw()
 
     const int text_margin = 20;
 
+    std::ostringstream oss;
+    oss << m_scale_target;
+
+    const std::string str_scale_target(oss.str());
+
     switch (m_chart_mode)
     {
         case CHART_MODE_ONE:
@@ -176,9 +192,9 @@ void Microtouch3MScopeApp::draw()
             const LineChart<int> &chart = m_charts.at(0);
 
             draw_text(chart.left() + text_margin, chart.top() + text_margin, "Combined");
-            draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+5000000", true);
+            draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+" + str_scale_target, true);
             draw_text(chart.left() + chart.width() - text_margin,
-                      chart.top() + chart.height() - text_margin, "-5000000", true, true);
+                      chart.top() + chart.height() - text_margin, "-" + str_scale_target, true, true);
         }
             break;
 
@@ -193,9 +209,9 @@ void Microtouch3MScopeApp::draw()
                     const LineChart<int> &chart = m_charts.at(i);
 
                     draw_text(chart.left() + text_margin, chart.top() + text_margin, names[i]);
-                    draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+5000000", true);
+                    draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+" + str_scale_target, true);
                     draw_text(chart.left() + chart.width() - text_margin,
-                              chart.top() + chart.height() - text_margin, "-5000000", true, true);
+                              chart.top() + chart.height() - text_margin, "-" + str_scale_target, true, true);
                 }
             }
         }

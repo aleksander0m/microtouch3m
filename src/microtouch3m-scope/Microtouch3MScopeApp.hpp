@@ -35,7 +35,8 @@ private:
     ChartMode m_chart_mode;
     BitmapFontRenderer m_bmp_font_renderer;
     std::string m_net_text;
-    M3MDevice m_m3m_dev;
+    uint32_t m_scale_target;
+    M3MDeviceMonitorThread m_m3m_dev_mon_thread;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

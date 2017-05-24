@@ -51,7 +51,9 @@ set(SOURCE_FILES
         Microtouch3MScopeApp.cpp
         BitmapFontRenderer.cpp
         BitmapFontRenderer.hpp
-        M3MDevice.cpp M3MDevice.hpp)
+        M3MDevice.cpp M3MDevice.hpp
+        Thread.cpp Thread.hpp
+        Mutex.cpp Mutex.hpp)
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 

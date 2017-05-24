@@ -3,6 +3,8 @@ bin_PROGRAMS = microtouch3m-scope
 
 microtouch3m_scope_SOURCES = \
 	font_13x16.xpm font_25x32.xpm \
+	Thread.cpp Thread.hpp \
+	Mutex.cpp Mutex.hpp \
 	M3MDevice.cpp M3MDevice.hpp \
 	BitmapFontRenderer.cpp BitmapFontRenderer.hpp \
 	Microtouch3MScopeApp.cpp Microtouch3MScopeApp.hpp \
