@@ -530,10 +530,10 @@ enum request_e {
 };
 
 enum parameter_id_e {
-    PARAMETER_ID_CONTROLLER_NOVRAM      = 0x0000,
-    PARAMETER_ID_CONTROLLER_STRAYS      = 0x0003,
-    PARAMETER_ID_CONTROLLER_SENSITIVITY = 0x0017,
-    PARAMETER_ID_CONTROLLER_EEPROM      = 0x0020,
+    PARAMETER_ID_CONTROLLER_NOVRAM   = 0x0000,
+    PARAMETER_ID_CONTROLLER_STRAYS   = 0x0003,
+    PARAMETER_ID_CONTROLLER_SETTINGS = 0x0017,
+    PARAMETER_ID_CONTROLLER_EEPROM   = 0x0020,
 };
 
 enum report_id_e {
@@ -932,7 +932,7 @@ microtouch3m_device_get_sensitivity_level (microtouch3m_device_t *dev,
     microtouch3m_log ("reading sensitivity");
     if ((st = run_parameter_in_request (dev,
                                         REQUEST_GET_PARAMETER_BLOCK,
-                                        PARAMETER_ID_CONTROLLER_SENSITIVITY,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
                                         VALUE_SENSITIVITY,
                                         (struct parameter_report_s *) &parameter_report,
                                         sizeof (parameter_report),
@@ -974,7 +974,7 @@ microtouch3m_device_set_sensitivity_level (microtouch3m_device_t *dev,
     microtouch3m_log ("setting sensitivity level...");
     if ((st = run_out_request (dev,
                                REQUEST_SET_PARAMETER_BLOCK,
-                               PARAMETER_ID_CONTROLLER_SENSITIVITY,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
                                VALUE_SENSITIVITY,
                                (const uint8_t *) &sensitivity,
                                sizeof (sensitivity),
@@ -1392,6 +1392,112 @@ microtouch3m_device_set_identifier (microtouch3m_device_t                       
 }
 
 /******************************************************************************/
+/* Orientation */
+
+static const char *orientation_str[] = {
+    "UR [9:00]",
+    "LR [6:00]",
+    "UL [12:00]",
+    "LL [3:00] (not rotated)",
+};
+
+const char *
+microtouch3m_device_orientation_to_string (microtouch3m_device_orientation_t orientation)
+{
+    if (orientation >= (sizeof (orientation_str) / sizeof (orientation_str[0])))
+        return NULL;
+    return orientation_str[orientation];
+}
+
+#define ORIENTATION_PARAMETER_NUMBER 1
+struct parameter_report_orientation_data_s {
+    struct parameter_report_s header;
+    uint16_t                  orientation; /* BE */
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_orientation (microtouch3m_device_t             *dev,
+                                     microtouch3m_device_orientation_t *orientation)
+{
+    microtouch3m_status_t                       st;
+    struct parameter_report_orientation_data_s  parameter_report;
+    uint16_t                                    aux;
+    const char                                 *str;
+
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER,
+                                        ORIENTATION_PARAMETER_NUMBER,
+                                        0x0000,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    aux = be16toh (parameter_report.orientation);
+    str = microtouch3m_device_orientation_to_string (aux);
+    if (!str) {
+        microtouch3m_log ("error: unexpected orientation value: %04x", aux);
+        return MICROTOUCH3M_STATUS_INVALID_DATA;
+    }
+
+    microtouch3m_log ("orientation data: %s", str);
+    if (orientation)
+        *orientation = (microtouch3m_device_orientation_t) aux;
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+#define VALUE_ORIENTATION 0x00f2
+
+microtouch3m_status_t
+microtouch3m_device_set_orientation (microtouch3m_device_t             *dev,
+                                     microtouch3m_device_orientation_t  orientation)
+{
+    const char *str;
+    uint16_t    aux;
+
+    str = microtouch3m_device_orientation_to_string (orientation);
+    if (!str)
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+
+    microtouch3m_log ("setting orientation data (block): %s", str);
+
+    aux = htobe16 ((uint16_t) orientation);
+    return run_out_request (dev,
+                            REQUEST_SET_PARAMETER_BLOCK,
+                            PARAMETER_ID_CONTROLLER_SETTINGS,
+                            VALUE_ORIENTATION,
+                            (const uint8_t *) &aux,
+                            sizeof (aux),
+                            NULL);
+}
+
+/* The restore operation seems to use a different command than the update
+ * operation... */
+static microtouch3m_status_t
+device_restore_orientation (microtouch3m_device_t             *dev,
+                            microtouch3m_device_orientation_t  orientation)
+{
+    const char *str;
+    uint16_t    aux;
+
+    str = microtouch3m_device_orientation_to_string (orientation);
+    if (!str)
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+
+    microtouch3m_log ("setting orientation data: %s", str);
+
+    aux = htobe16 ((uint16_t) orientation);
+    return run_out_request (dev,
+                            REQUEST_SET_PARAMETER,
+                            ORIENTATION_PARAMETER_NUMBER,
+                            0x0000,
+                            (const uint8_t *) &aux,
+                            sizeof (aux),
+                            NULL);
+}
+
+/******************************************************************************/
 /* Device async report operation */
 
 #define MAX_INTERRUPT_ENDPOINT_TRANSFER 32
@@ -1666,18 +1772,11 @@ struct parameter_report_calibration_data_s {
     uint8_t                   data [CALIBRATION_DATA_SIZE];
 } __attribute__((packed));
 
-#define ORIENTATION_PARAMETER_NUMBER 1
-#define ORIENTATION_DATA_SIZE        2
-struct parameter_report_orientation_data_s {
-    struct parameter_report_s header;
-    uint8_t                   data [ORIENTATION_DATA_SIZE];
-} __attribute__((packed));
-
 struct microtouch3m_device_data_s {
     struct microtouch3m_device_linearization_data_s linearization_data;
     struct microtouch3m_device_identifier_s         identifier;
-    uint8_t calibration_data   [CALIBRATION_DATA_SIZE];
-    uint8_t orientation_data   [ORIENTATION_DATA_SIZE];
+    uint16_t                                        orientation;
+    uint8_t calibration_data [CALIBRATION_DATA_SIZE];
 };
 
 microtouch3m_status_t
@@ -1725,19 +1824,12 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
 
     microtouch3m_log ("backing up orientation data...");
     {
-        struct parameter_report_orientation_data_s parameter_report;
+        microtouch3m_device_orientation_t orientation;
 
-        if ((st = run_parameter_in_request (dev,
-                                            REQUEST_GET_PARAMETER,
-                                            ORIENTATION_PARAMETER_NUMBER,
-                                            0x0000,
-                                            (struct parameter_report_s *) &parameter_report,
-                                            sizeof (parameter_report),
-                                            NULL)) != MICROTOUCH3M_STATUS_OK)
+        if ((st = microtouch3m_device_get_orientation (dev, &orientation)) != MICROTOUCH3M_STATUS_OK)
             goto out;
-
-        memcpy (data->orientation_data, parameter_report.data, ORIENTATION_DATA_SIZE);
-        microtouch3m_log_buffer ("orientation data backed up", data->orientation_data, ORIENTATION_DATA_SIZE);
+        microtouch3m_log ("orientation backed up: %s", microtouch3m_device_orientation_to_string (orientation));
+        data->orientation = htobe16 ((uint16_t) orientation);
     }
 
     microtouch3m_log ("backing up identifier data...");
@@ -1784,13 +1876,7 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
         return st;
 
     microtouch3m_log ("restoring orientation data...");
-    if ((st = run_out_request (dev,
-                               REQUEST_SET_PARAMETER,
-                               ORIENTATION_PARAMETER_NUMBER,
-                               0x0000,
-                               data->orientation_data,
-                               ORIENTATION_DATA_SIZE,
-                               NULL)) != MICROTOUCH3M_STATUS_OK)
+    if ((st = device_restore_orientation (dev, (microtouch3m_device_orientation_t) be16toh (data->orientation))) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     microtouch3m_log ("restoring identifier data...");

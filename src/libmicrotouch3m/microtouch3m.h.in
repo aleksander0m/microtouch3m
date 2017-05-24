@@ -569,6 +569,59 @@ microtouch3m_status_t microtouch3m_device_set_identifier (microtouch3m_device_t 
                                                           const struct microtouch3m_device_identifier_s *identifier);
 
 /******************************************************************************/
+/* Orientation */
+
+/**
+ * microtouch3m_device_orientation_t:
+ * @MICROTOUCH3M_DEVICE_ORIENTATION_UR: Upper-right.
+ * @MICROTOUCH3M_DEVICE_ORIENTATION_LR: Lower-right.
+ * @MICROTOUCH3M_DEVICE_ORIENTATION_UL: Upper-left.
+ * @MICROTOUCH3M_DEVICE_ORIENTATION_LL: Lower-left, not rotated.
+ *
+ * The screen orientation.
+ */
+typedef enum {
+    MICROTOUCH3M_DEVICE_ORIENTATION_UR = 0,
+    MICROTOUCH3M_DEVICE_ORIENTATION_LR = 1,
+    MICROTOUCH3M_DEVICE_ORIENTATION_UL = 2,
+    MICROTOUCH3M_DEVICE_ORIENTATION_LL = 3,
+} microtouch3m_device_orientation_t;
+
+/**
+ * microtouch3m_device_orientation_to_string:
+ * @orientation: a #microtouch3m_device_orientation_t.
+ *
+ * Gets a description for the given #microtouch3m_device_orientation_t.
+ *
+ * Returns: a constant string.
+ */
+const char *microtouch3m_device_orientation_to_string (microtouch3m_device_orientation_t orientation);
+
+/**
+ * microtouch3m_device_get_orientation:
+ * @dev: a #microtouch3m_device_t.
+ * @orientation: output location to store the orientation.
+ *
+ * Get the orientation from the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_orientation (microtouch3m_device_t             *dev,
+                                                           microtouch3m_device_orientation_t *orientation);
+
+/**
+ * microtouch3m_device_set_orientation:
+ * @dev: a #microtouch3m_device_t.
+ * @orientation: the orientation.
+ *
+ * Update the orientation in the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_orientation (microtouch3m_device_t             *dev,
+                                                           microtouch3m_device_orientation_t  orientation);
+
+/******************************************************************************/
 /* Read strays */
 
 /**
