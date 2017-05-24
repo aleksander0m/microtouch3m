@@ -454,27 +454,35 @@ run_set_identifier (microtouch3m_context_t *ctx,
                     bool                    first,
                     uint8_t                 bus_number,
                     uint8_t                 device_address,
-                    uint8_t                 id0,
-                    uint8_t                 id1,
-                    uint8_t                 id2,
-                    uint8_t                 id3)
+                    const char             *identifier_str)
 {
-    microtouch3m_device_t                   *dev;
     microtouch3m_status_t                    st;
+    microtouch3m_device_t                   *dev = NULL;
     int                                      ret = EXIT_FAILURE;
-    struct microtouch3m_device_identifier_s  identifier = {
-        .id = { id0, id1, id2, id3 }
-    };
+    unsigned int                             aux0, aux1, aux2, aux3;
+    struct microtouch3m_device_identifier_s  identifier;
+
+    if ((sscanf (identifier_str, "%x:%x:%x:%x", &aux0, &aux1, &aux2, &aux3) != 4) ||
+        (aux0 > 0xff || aux1 > 0xff || aux2 > 0xff || aux3 > 0xff)) {
+        fprintf (stderr, "error: invalid identifier value given: %s\n", identifier_str);
+        goto out;
+    }
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
+
+    identifier.id[0] = (uint8_t) aux0;
+    identifier.id[1] = (uint8_t) aux1;
+    identifier.id[2] = (uint8_t) aux2;
+    identifier.id[3] = (uint8_t) aux3;
 
     if ((st = microtouch3m_device_set_identifier (dev, &identifier)) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't set identifier: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
 
-    printf ("successfully set identifier to: %02x:%02x:%02x:%02x\n", id0, id1, id2, id3);
+    printf ("successfully set identifier to: %02x:%02x:%02x:%02x\n",
+            identifier.id[0], identifier.id[1], identifier.id[2], identifier.id[3]);
     ret = EXIT_SUCCESS;
 
 out:
@@ -491,17 +499,25 @@ run_set_sensitivity_level (microtouch3m_context_t *ctx,
                            bool                    first,
                            uint8_t                 bus_number,
                            uint8_t                 device_address,
-                           uint8_t                 level)
+                           const char             *level_str)
 {
-    microtouch3m_device_t *dev;
+    microtouch3m_device_t *dev = NULL;
     microtouch3m_status_t  st;
     int                    ret = EXIT_FAILURE;
     uint8_t                read_level;
+    unsigned long          aux;
+
+    errno = 0;
+    aux = strtoul (level_str, NULL, 10);
+    if (errno || aux > MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX) {
+        fprintf (stderr, "error: invalid sensitivity level value given: %s\n", level_str);
+        goto out;
+    }
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
-    if ((st = microtouch3m_device_set_sensitivity_level (dev, level)) != MICROTOUCH3M_STATUS_OK) {
+    if ((st = microtouch3m_device_set_sensitivity_level (dev, (uint8_t) aux)) != MICROTOUCH3M_STATUS_OK) {
         fprintf (stderr, "error: couldn't set sensitivity level: %s\n", microtouch3m_status_to_string (st));
         goto out;
     }
@@ -517,12 +533,12 @@ run_set_sensitivity_level (microtouch3m_context_t *ctx,
         goto out;
     }
 
-    if (read_level != level) {
-        fprintf (stderr, "error: sensitivity level setting failed (requested %u, real %u)\n", level, read_level);
+    if (read_level != aux) {
+        fprintf (stderr, "error: sensitivity level setting failed (requested %lu, real %u)\n", aux, read_level);
         goto out;
     }
 
-    printf ("successfully set sensitivity level to: %u\n", level);
+    printf ("successfully set sensitivity level to: %lu\n", aux);
     ret = EXIT_SUCCESS;
 
 out:
@@ -554,24 +570,32 @@ run_set_frequency (microtouch3m_context_t *ctx,
                    bool                    first,
                    uint8_t                 bus_number,
                    uint8_t                 device_address,
-                   unsigned long           frequency)
+                   const char             *frequency_str)
 {
-    microtouch3m_device_t           *dev;
+    microtouch3m_device_t           *dev = NULL;
     microtouch3m_status_t            st;
     int                              ret = EXIT_FAILURE;
     int                              i;
     microtouch3m_device_frequency_t  read_id;
+    unsigned long                    aux;
+
+    errno = 0;
+    aux = strtoul (frequency_str, NULL, 10);
+    if (errno) {
+        fprintf (stderr, "error: invalid frequency value given: %s\n", frequency_str);
+        goto out;
+    }
 
     if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
         goto out;
 
     for (i = 0; i < N_FREQS; i++) {
-        if (freq_id[i].value == frequency)
+        if (freq_id[i].value == aux)
             break;
     }
 
     if (i == N_FREQS) {
-        fprintf (stderr, "error: unknown frequency preset requested: %lumHz\n", frequency);
+        fprintf (stderr, "error: unknown frequency preset requested: %lumHz\n", aux);
         goto out;
     }
 
@@ -1852,36 +1876,13 @@ int main (int argc, char **argv)
         ret = run_list (ctx);
     else if (info)
         ret = run_info (ctx, first, bus_number, device_address);
-    else if (set_identifier) {
-        unsigned int aux0, aux1, aux2, aux3;
-
-        if ((sscanf (set_identifier, "%x:%x:%x:%x", &aux0, &aux1, &aux2, &aux3) != 4) ||
-            (aux0 > 0xff || aux1 > 0xff || aux2 > 0xff || aux3 > 0xff)) {
-            fprintf (stderr, "error: invalid --set-identifier value given: %s\n", set_identifier);
-            goto out;
-        }
-        ret = run_set_identifier (ctx, first, bus_number, device_address, (uint8_t) aux0, (uint8_t) aux1, (uint8_t) aux2, (uint8_t) aux3);
-    } else if (set_sensitivity_level) {
-        unsigned long aux;
-
-        errno = 0;
-        aux = strtoul (set_sensitivity_level, NULL, 10);
-        if (errno || aux > MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX) {
-            fprintf (stderr, "error: invalid --set-sensitivity-level value given: %s\n", set_sensitivity_level);
-            goto out;
-        }
-        ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, (uint8_t) aux);
-    } else if (set_frequency) {
-        unsigned long aux;
-
-        errno = 0;
-        aux = strtoul (set_frequency, NULL, 10);
-        if (errno) {
-            fprintf (stderr, "error: invalid --set-frequency value given: %s\n", set_frequency);
-            goto out;
-        }
-        ret = run_set_frequency (ctx, first, bus_number, device_address, aux);
-    } else if (scope)
+    else if (set_identifier)
+        ret = run_set_identifier (ctx, first, bus_number, device_address, set_identifier);
+    else if (set_sensitivity_level)
+        ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, set_sensitivity_level);
+    else if (set_frequency)
+        ret = run_set_frequency (ctx, first, bus_number, device_address, set_frequency);
+    else if (scope)
         ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
     else if (frequency_check)
         ret = run_frequency_check (ctx, first, bus_number, device_address);
