@@ -35,3 +35,7 @@ Makefile.in
 /src/microtouch3m-cli/microtouch3m-cli
 
 /src/microtouch3m-scope/microtouch3m-scope
+
+/src/microtouch3m-scope/.idea
+/src/microtouch3m-scope/cmake-build-debug
+/src/microtouch3m-scope/build
