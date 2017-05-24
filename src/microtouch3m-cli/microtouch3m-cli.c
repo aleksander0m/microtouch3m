@@ -400,6 +400,17 @@ run_info (microtouch3m_context_t *ctx,
                 identifier.id[0], identifier.id[1], identifier.id[2], identifier.id[3]);
     } while (0);
 
+    /* Orientation */
+    do {
+        microtouch3m_device_orientation_t orientation;
+
+        if ((st = microtouch3m_device_get_orientation (dev, &orientation)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get orientation: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+        printf ("\torientation:       %s\n", microtouch3m_device_orientation_to_string (orientation));
+    } while (0);
+
     /* Sensitivity level */
     do {
         uint8_t level;
@@ -483,6 +494,52 @@ run_set_identifier (microtouch3m_context_t *ctx,
 
     printf ("successfully set identifier to: %02x:%02x:%02x:%02x\n",
             identifier.id[0], identifier.id[1], identifier.id[2], identifier.id[3]);
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: set orientation */
+
+static int
+run_set_orientation (microtouch3m_context_t *ctx,
+                     bool                    first,
+                     uint8_t                 bus_number,
+                     uint8_t                 device_address,
+                     const char             *orientation_str)
+{
+    microtouch3m_status_t              st;
+    microtouch3m_device_t             *dev = NULL;
+    int                                ret = EXIT_FAILURE;
+    microtouch3m_device_orientation_t  orientation;
+
+    if (strcmp (orientation_str, "LL") == 0 || strcmp (orientation_str, "ll") == 0)
+        orientation = MICROTOUCH3M_DEVICE_ORIENTATION_LL;
+    else if (strcmp (orientation_str, "LR") == 0 || strcmp (orientation_str, "lr") == 0)
+        orientation = MICROTOUCH3M_DEVICE_ORIENTATION_LR;
+    else if (strcmp (orientation_str, "UL") == 0 || strcmp (orientation_str, "ul") == 0)
+        orientation = MICROTOUCH3M_DEVICE_ORIENTATION_UL;
+    else if (strcmp (orientation_str, "UR") == 0 || strcmp (orientation_str, "ur") == 0)
+        orientation = MICROTOUCH3M_DEVICE_ORIENTATION_UR;
+    else {
+        fprintf (stderr, "error: invalid orientation value given: %s\n", orientation_str);
+        goto out;
+    }
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_set_orientation (dev, orientation)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set orientation: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("successfully set orientation to: %s\n",
+            microtouch3m_device_orientation_to_string (orientation));
     ret = EXIT_SUCCESS;
 
 out:
@@ -1571,6 +1628,7 @@ print_help (void)
             "Common device actions:\n"
             "  -i, --info                             Show device information.\n"
             "  -I, --set-identifier=[HH:HH:HH:HH]     Set the 4 byte identifier.\n"
+            "  -o, --set-orientation=[OR]             Set the orientation (See Notes).\n"
             "  -l, --set-sensitivity-level=[LVL]      Set sensitivity level (See Notes).\n"
             "  -r, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
             "\n"
@@ -1605,6 +1663,8 @@ print_help (void)
             "  * The --firmware-update action will perform a controller reboot automatically.\n"
             "  * The --restore-data-backup may be given as an additional option to the --firmware-update\n"
             "    command, or alternatively as a command itself.\n"
+            "\n"
+            "  * The [OR] value in --set-orientation may be any of: LL, LR, UL, UR\n"
             "\n"
             "  * The --set-sensitivity-level action will perform a controller reboot automatically.\n"
             "  * The [LVL] value in --set-sensitivity-level may be any between 0 (min) and 6 (max).\n"
@@ -1678,6 +1738,7 @@ int main (int argc, char **argv)
     bool                    first                     = false;
     bool                    info                      = false;
     char                   *set_identifier            = NULL;
+    char                   *set_orientation           = NULL;
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
     bool                    frequency_check           = false;
@@ -1701,6 +1762,7 @@ int main (int argc, char **argv)
         { "first",                     no_argument,       0, 'f' },
         { "info",                      no_argument,       0, 'i' },
         { "set-identifier",            required_argument, 0, 'I' },
+        { "set-orientation",           required_argument, 0, 'o' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
         { "set-frequency",             required_argument, 0, 'r' },
         { "frequency-check",           no_argument,       0, 'F' },
@@ -1724,7 +1786,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fiI:l:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fiI:o:l:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1740,6 +1802,9 @@ int main (int argc, char **argv)
             break;
         case 'I':
             set_identifier = strdup (optarg);
+            break;
+        case 'o':
+            set_orientation = strdup (optarg);
             break;
         case 'l':
             set_sensitivity_level = strdup (optarg);
@@ -1817,6 +1882,7 @@ int main (int argc, char **argv)
     n_actions_require_device =
         info +
         !!set_identifier +
+        !!set_orientation +
         !!set_sensitivity_level +
         !!set_frequency +
         frequency_check +
@@ -1878,6 +1944,8 @@ int main (int argc, char **argv)
         ret = run_info (ctx, first, bus_number, device_address);
     else if (set_identifier)
         ret = run_set_identifier (ctx, first, bus_number, device_address, set_identifier);
+    else if (set_orientation)
+        ret = run_set_orientation (ctx, first, bus_number, device_address, set_orientation);
     else if (set_sensitivity_level)
         ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, set_sensitivity_level);
     else if (set_frequency)
@@ -1910,6 +1978,7 @@ out:
     free (restore_data_backup);
     free (validate_fw_file);
     free (set_sensitivity_level);
+    free (set_orientation);
     free (set_identifier);
     return ret;
 }
