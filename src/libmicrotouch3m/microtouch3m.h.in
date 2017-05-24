@@ -532,6 +532,43 @@ microtouch3m_status_t microtouch3m_linearization_data_file_write (const char    
                                                                   const struct microtouch3m_device_linearization_data_s *data);
 
 /******************************************************************************/
+/* Controller identifier */
+
+/**
+ * microtouch3m_device_identifier_s:
+ * @id: Four byte identifier.
+ *
+ * The device identifier.
+ */
+struct microtouch3m_device_identifier_s {
+    uint8_t id[4];
+} __attribute__((packed));
+
+/**
+ * microtouch3m_device_get_identifier:
+ * @dev: a #microtouch3m_device_t.
+ * @identifier: output location to store the identifier.
+ *
+ * Get the identifier from the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_identifier (microtouch3m_device_t                   *dev,
+                                                          struct microtouch3m_device_identifier_s *identifier);
+
+/**
+ * microtouch3m_device_set_identifier:
+ * @dev: a #microtouch3m_device_t.
+ * @identifier: the identifier.
+ *
+ * Update the identifier in the device.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_identifier (microtouch3m_device_t                         *dev,
+                                                          const struct microtouch3m_device_identifier_s *identifier);
+
+/******************************************************************************/
 /* Read strays */
 
 /**

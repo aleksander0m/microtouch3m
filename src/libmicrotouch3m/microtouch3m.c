@@ -1348,6 +1348,50 @@ out:
 }
 
 /******************************************************************************/
+/* Controller identifier */
+
+#define IDENTIFIER_PARAMETER_NUMBER 2
+struct parameter_report_identifier_data_s {
+    struct parameter_report_s               header;
+    struct microtouch3m_device_identifier_s identifier;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_identifier (microtouch3m_device_t                   *dev,
+                                    struct microtouch3m_device_identifier_s *identifier)
+{
+    microtouch3m_status_t                     st;
+    struct parameter_report_identifier_data_s parameter_report;
+
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER,
+                                        IDENTIFIER_PARAMETER_NUMBER,
+                                        0x0000,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    microtouch3m_log_buffer ("identifier data retrieved", (const uint8_t *) &parameter_report.identifier, sizeof (parameter_report.identifier));
+    memcpy (identifier->id, &parameter_report.identifier, sizeof (parameter_report.identifier));
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+microtouch3m_status_t
+microtouch3m_device_set_identifier (microtouch3m_device_t                         *dev,
+                                    const struct microtouch3m_device_identifier_s *identifier)
+{
+    microtouch3m_log_buffer ("setting identifier...", (const uint8_t *) identifier, sizeof (struct microtouch3m_device_identifier_s));
+    return run_out_request (dev,
+                            REQUEST_SET_PARAMETER,
+                            IDENTIFIER_PARAMETER_NUMBER,
+                            0x0000,
+                            (const uint8_t *) identifier,
+                            sizeof (struct microtouch3m_device_identifier_s),
+                            NULL);
+}
+
+/******************************************************************************/
 /* Device async report operation */
 
 #define MAX_INTERRUPT_ENDPOINT_TRANSFER 32
@@ -1629,18 +1673,11 @@ struct parameter_report_orientation_data_s {
     uint8_t                   data [ORIENTATION_DATA_SIZE];
 } __attribute__((packed));
 
-#define IDENTIFIER_PARAMETER_NUMBER 2
-#define IDENTIFIER_DATA_SIZE        4
-struct parameter_report_identifier_data_s {
-    struct parameter_report_s header;
-    uint8_t                   data [IDENTIFIER_DATA_SIZE];
-} __attribute__((packed));
-
 struct microtouch3m_device_data_s {
     struct microtouch3m_device_linearization_data_s linearization_data;
+    struct microtouch3m_device_identifier_s         identifier;
     uint8_t calibration_data   [CALIBRATION_DATA_SIZE];
     uint8_t orientation_data   [ORIENTATION_DATA_SIZE];
-    uint8_t identifier_data    [IDENTIFIER_DATA_SIZE];
 };
 
 microtouch3m_status_t
@@ -1704,21 +1741,9 @@ microtouch3m_device_backup_data (microtouch3m_device_t       *dev,
     }
 
     microtouch3m_log ("backing up identifier data...");
-    {
-        struct parameter_report_identifier_data_s parameter_report;
-
-        if ((st = run_parameter_in_request (dev,
-                                            REQUEST_GET_PARAMETER,
-                                            IDENTIFIER_PARAMETER_NUMBER,
-                                            0x0000,
-                                            (struct parameter_report_s *) &parameter_report,
-                                            sizeof (parameter_report),
-                                            NULL)) != MICROTOUCH3M_STATUS_OK)
-            goto out;
-
-        memcpy (data->identifier_data, parameter_report.data, IDENTIFIER_DATA_SIZE);
-        microtouch3m_log_buffer ("identifier data backed up", data->identifier_data, IDENTIFIER_DATA_SIZE);
-    }
+    if ((st = microtouch3m_device_get_identifier (dev, &data->identifier)) != MICROTOUCH3M_STATUS_OK)
+        goto out;
+    microtouch3m_log_buffer ("identifier backed up", (const uint8_t *) &(data->identifier), sizeof (data->identifier));
 
     /* Success! */
     microtouch3m_log ("successfully backed up controller data");
@@ -1755,7 +1780,6 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
         return st;
 
     microtouch3m_log ("restoring linearization data...");
-
     if ((st = microtouch3m_device_set_linearization_data (dev, &data->linearization_data)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
@@ -1770,13 +1794,7 @@ microtouch3m_device_restore_data (microtouch3m_device_t            *dev,
         return st;
 
     microtouch3m_log ("restoring identifier data...");
-    if ((st = run_out_request (dev,
-                               REQUEST_SET_PARAMETER,
-                               IDENTIFIER_PARAMETER_NUMBER,
-                               0x0000,
-                               data->identifier_data,
-                               IDENTIFIER_DATA_SIZE,
-                               NULL)) != MICROTOUCH3M_STATUS_OK)
+    if ((st = microtouch3m_device_set_identifier (dev, &data->identifier)) != MICROTOUCH3M_STATUS_OK)
         return st;
 
     /* Success! */
