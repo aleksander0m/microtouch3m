@@ -4,6 +4,7 @@
 #include "SDLApp.hpp"
 #include "LineChart.hpp"
 #include "BitmapFontRenderer.hpp"
+#include "M3MDevice.hpp"
 
 class Microtouch3MScopeApp : public SDLApp
 {
@@ -34,6 +35,7 @@ private:
     ChartMode m_chart_mode;
     BitmapFontRenderer m_bmp_font_renderer;
     std::string m_net_text;
+    M3MDevice m_m3m_dev;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

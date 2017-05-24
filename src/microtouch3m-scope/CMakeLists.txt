@@ -12,6 +12,16 @@ project(microtouch3m-scope)
 
 if (IMX51)
     add_definitions(-DIMX51)
+
+    include_directories(${PROJECT_SOURCE_DIR}/../../build/imx51/include)
+    find_library(MICROTOUCH3M_LIBRARY microtouch3m ${PROJECT_SOURCE_DIR}/../../build/imx51/lib)
+else()
+    include_directories(${PROJECT_SOURCE_DIR}/../../build/pc/include)
+    find_library(MICROTOUCH3M_LIBRARY microtouch3m ${PROJECT_SOURCE_DIR}/../../build/pc/lib)
+endif()
+
+if (NOT MICROTOUCH3M_LIBRARY)
+    message(FATAL_ERROR "MICROTOUCH3M library Not found")
 endif()
 
 set(CMAKE_CXX_STANDARD 98)
@@ -34,7 +44,14 @@ if (NOT SDL_NET_FOUND)
     message(FATAL_ERROR "SDL_net Not found")
 endif()
 
-set(SOURCE_FILES main.cpp SDLUtils.cpp SDLApp.cpp Microtouch3MScopeApp.cpp BitmapFontRenderer.cpp BitmapFontRenderer.hpp)
+set(SOURCE_FILES
+        main.cpp
+        SDLUtils.cpp
+        SDLApp.cpp
+        Microtouch3MScopeApp.cpp
+        BitmapFontRenderer.cpp
+        BitmapFontRenderer.hpp
+        M3MDevice.cpp M3MDevice.hpp)
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 

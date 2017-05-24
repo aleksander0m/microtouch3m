@@ -58,6 +58,10 @@ Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint
         }
     }
 #endif
+
+    m_m3m_dev.open();
+    m_m3m_dev.print_info();
+    m_m3m_dev.read_strays();
 }
 
 Microtouch3MScopeApp::~Microtouch3MScopeApp()
@@ -84,10 +88,14 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
 
     // update charts
 
-    int test_val0 = (int) (sin(SDL_GetTicks() * 0.01) * 100 - 190);
-    int test_val1 = (int) (cos(SDL_GetTicks() * 0.05) * 50 + 50);
-    int test_val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
-    int test_val3 = (int) (m_current_pos % 30 - 100);
+    m_m3m_dev.test_async();
+
+    const double scale = (screen_surface()->h / 2 - 10) / 5000000.0;
+
+    int val0 = (int) (m_m3m_dev.ul_corrected_signal() * scale);
+    int val1 = (int) (m_m3m_dev.ur_corrected_signal() * scale);
+    int val2 = (int) (m_m3m_dev.ll_corrected_signal() * scale);
+    int val3 = (int) (m_m3m_dev.lr_corrected_signal() * scale);
 
     switch (m_chart_mode)
     {
@@ -99,10 +107,10 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
 
                 LineChart<int> &chart = m_charts.at(0);
 
-                chart.curve(0).set(pos, test_val0);
-                chart.curve(1).set(pos, test_val1);
-                chart.curve(2).set(pos, test_val2);
-                chart.curve(3).set(pos, test_val3);
+                chart.curve(0).set(pos, val0);
+                chart.curve(1).set(pos, val1);
+                chart.curve(2).set(pos, val2);
+                chart.curve(3).set(pos, val3);
             }
         }
             break;
@@ -113,10 +121,10 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
             {
                 uint32_t pos = (uint32_t) (m_current_pos % m_sample_count);
 
-                m_charts.at(0).curve(0).set(pos, test_val0);
-                m_charts.at(1).curve(0).set(pos, test_val1);
-                m_charts.at(2).curve(0).set(pos, test_val2);
-                m_charts.at(3).curve(0).set(pos, test_val3);
+                m_charts.at(0).curve(0).set(pos, val0);
+                m_charts.at(1).curve(0).set(pos, val1);
+                m_charts.at(2).curve(0).set(pos, val2);
+                m_charts.at(3).curve(0).set(pos, val3);
             }
         }
             break;
