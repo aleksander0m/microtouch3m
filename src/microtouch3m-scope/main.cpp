@@ -9,21 +9,21 @@ int main()
 {
     try
     {
-#if defined(IMX6) || defined(IMX51)
+#if defined(IMX51)
         int width = 0; int height = 0;
 #else
         int width = 1280; int height = 800;
 #endif
 
         Uint32 flags = SDL_SWSURFACE
-#if defined(IMX6) || defined(IMX51)
+#if defined(IMX51)
             | SDL_FULLSCREEN
 #endif
         ;
 
         Microtouch3MScopeApp sdlApp(width, height, flags, FPS_LIMIT);
 
-#if defined(IMX6) || defined(IMX51)
+#if defined(IMX51)
         sdlApp.enable_cursor(false);
 #endif
 
