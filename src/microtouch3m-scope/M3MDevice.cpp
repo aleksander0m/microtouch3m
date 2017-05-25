@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cmath>
 
+#include <time.h>
+
 #define PROCESS_IQ(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
 
 M3MContext::M3MContext()
@@ -145,6 +147,8 @@ bool M3MDeviceMonitorThread::run()
 {
     try
     {
+        m_strays_update_time = 0;
+
         m_m3m_dev = new M3MDevice();
 
         m_m3m_dev->open();
@@ -187,6 +191,18 @@ bool M3MDeviceMonitorThread::monitor_async_reports_callback(microtouch3m_device_
     ((int64_t) ll_signal) - ((int64_t) thread->m_m3m_dev->m_ll_stray_signal),
     ((int64_t) lr_signal) - ((int64_t) thread->m_m3m_dev->m_lr_stray_signal)
     ));
+
+    timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+
+    if (!thread->m_strays_update_time) thread->m_strays_update_time = (uint64_t) t.tv_nsec;
+
+    const uint64_t nsec = (const uint64_t) t.tv_nsec;
+    if (nsec - thread->m_strays_update_time >= 500000000)
+    {
+        thread->m_m3m_dev->read_strays();
+        thread->m_strays_update_time = nsec;
+    }
 
     return !thread->get_exit();
 }
