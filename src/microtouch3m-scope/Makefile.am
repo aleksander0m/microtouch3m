@@ -1,4 +1,6 @@
 
+if BUILD_SCOPE
+
 bin_PROGRAMS = microtouch3m-scope
 
 microtouch3m_scope_SOURCES = \
@@ -31,6 +33,8 @@ microtouch3m_scope_LDADD = \
 	$(SDLNET_LIBS) \
 	$(SDL_LIBS) \
 	$(NULL)
+
+endif
 
 EXTRA_DIST = \
 	font_13x16.xcf \
