@@ -12,13 +12,11 @@ void ::sdl_utils::set_clip_area(int x = 0, int y = 0, int width = 999999, int he
     m_clip_y1 = m_clip_y0 + height;
 }
 
-void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, const Color &color)
+void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32 color)
 {
     if (x >= surface->w || y >= surface->h) return;
 
     if (x < m_clip_x0 || x > m_clip_x1 || y < m_clip_y0 || y > m_clip_y1) return;
-
-    const Uint32 col = SDL_MapRGB(surface->format, color.r, color.g, color.b);
 
     const int bpp = surface->format->BytesPerPixel;
 
@@ -27,39 +25,39 @@ void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, const 
     switch (bpp)
     {
         case 1:
-            *p = (Uint8) col;
+            *p = (Uint8) color;
             break;
 
         case 2:
-            *(Uint16 *) p = (Uint16) col;
+            *(Uint16 *) p = (Uint16) color;
             break;
 
         case 3:
             if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
             {
                 // bgr
-                p[0] = (col >> 16) & 0xff;
-                p[1] = (col >> 8) & 0xff;
-                p[2] = col & 0xff;
+                p[0] = (color >> 16) & 0xff;
+                p[1] = (color >> 8) & 0xff;
+                p[2] = color & 0xff;
             }
             else
             {
                 // rgb
-                p[0] = col & 0xff;
-                p[1] = (col >> 8) & 0xff;
-                p[2] = (col >> 16) & 0xff;
+                p[0] = color & 0xff;
+                p[1] = (color >> 8) & 0xff;
+                p[2] = (color >> 16) & 0xff;
             }
             break;
 
         case 4:
-            *(Uint32 *) p = col;
+            *(Uint32 *) p = color;
             break;
 
         default:break;
     }
 }
 
-void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_t x1, int32_t y1, const Color &color)
+void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_t x1, int32_t y1, Uint32 color)
 {
     const bool steep = (abs(y1 - y0) > abs(x1 - x0));
 

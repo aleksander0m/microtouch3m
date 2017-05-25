@@ -14,6 +14,11 @@ struct Color
     b(blue)
     { }
 
+    Uint32 map_rgb(const SDL_PixelFormat * const format) const
+    {
+        return SDL_MapRGB(format, r, g, b);
+    }
+
     uint8_t r, g, b;
 };
 

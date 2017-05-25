@@ -46,6 +46,8 @@ endif()
 
 set(SOURCE_FILES
         main.cpp
+        LineChart.hpp
+        Color.hpp
         SDLUtils.cpp
         SDLApp.cpp
         Microtouch3MScopeApp.cpp

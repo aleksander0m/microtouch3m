@@ -79,6 +79,7 @@ public:
 
             bool first = true;
             int32_t px = 0, py = 0;
+            const Uint32 col = curve.color.map_rgb(surface->format);
 
             for (int i = 0; i < curve.data.size(); ++i)
             {
@@ -94,7 +95,7 @@ public:
                 sdl_utils::draw_line(surface,
                                     px + m_left, m_top + m_height / 2 - py,
                                     x + m_left, m_top + m_height / 2 - y,
-                                    curve.color);
+                                    col);
 
                 px = x; py = y;
             }
@@ -102,7 +103,7 @@ public:
 
         // border
 
-        const Color col_border(0xff, 0xff, 0x0);
+        const Uint32 col_border(Color(0xff, 0xff, 0x0).map_rgb(surface->format));
 
         sdl_utils::draw_line(surface,
                             m_left, m_top,
@@ -126,7 +127,7 @@ public:
 
         // horizontal
 
-        const Color col_axis_x(0xff, 0xff, 0x0);
+        const Uint32 col_axis_x(Color(0xff, 0xff, 0x0).map_rgb(surface->format));
 
         sdl_utils::draw_line(surface,
                             m_left, m_top + m_height / 2,
@@ -145,7 +146,7 @@ public:
 
         // vertical
 
-        const Color col_axis_y(0xaa, 0xff, 0xaa);
+        const Uint32 col_axis_y(Color(0xaa, 0xff, 0xaa).map_rgb(surface->format));
 
         sdl_utils::draw_line(surface,
                             (int32_t) (m_left + m_width * m_progress), m_top,
