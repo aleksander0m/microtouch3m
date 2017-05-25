@@ -77,7 +77,26 @@ PKG_CHECK_MODULES([SDLIMAGE], [SDL_image >= $SDLIMAGE_REQUIRED_VERSION], [have_s
 AC_SUBST(SDLIMAGE_CFLAGS)
 AC_SUBST(SDLIMAGE_LIBS)
 
-# microtouch3m-scope is optional
+dnl udev rules file to make the device world writable is optional
+AC_ARG_ENABLE([udev-rules],
+              AS_HELP_STRING([--enable-udev-rules],
+                             [Install udev rules to make devices world writable [default=no]]),
+              [install_udev_rules=$enableval],
+              [install_udev_rules=no])
+AM_CONDITIONAL(INSTALL_UDEV_RULES, test "x$install_udev_rules" = "xyes")
+
+dnl udev base directory
+AC_ARG_WITH([udev-base-dir],
+            AS_HELP_STRING([--with-udev-base-dir=DIR],
+                           [where the udev base directory is [default=/lib/udev]]))
+if test -n "$with_udev_base_dir" ; then
+    UDEV_BASE_DIR="$with_udev_base_dir"
+else
+    UDEV_BASE_DIR="/lib/udev"
+fi
+AC_SUBST(UDEV_BASE_DIR)
+
+dnl microtouch3m-scope is optional
 AC_ARG_ENABLE([scope],
               AS_HELP_STRING([--enable-scope],
                              [build microtouch3m-scope [default=yes]]),
@@ -103,7 +122,8 @@ AC_CONFIG_FILES([Makefile
                  src/libmicrotouch3m/microtouch3m.h
                  src/libmicrotouch3m/libGIS/Makefile
                  src/microtouch3m-cli/Makefile
-                 src/microtouch3m-scope/Makefile])
+                 src/microtouch3m-scope/Makefile
+                 data/Makefile])
 AC_OUTPUT
 
 echo "
@@ -120,9 +140,11 @@ echo "
 
     System paths:
       prefix:               ${prefix}
+      udev base directory:  ${UDEV_BASE_DIR}
 
     Components:
       libmicrotouch3m:      yes
       microtouch3m-cli:     yes
       microtouch3m-scope:   ${build_scope}
+      udev rules:           ${install_udev_rules}
 "
