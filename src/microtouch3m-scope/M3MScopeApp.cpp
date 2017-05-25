@@ -191,10 +191,10 @@ void M3MScopeApp::draw()
         {
             const LineChart<int> &chart = m_charts.at(0);
 
-            draw_text(chart.left() + text_margin, chart.top() + text_margin, "Combined");
-            draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+" + str_scale_target, true);
-            draw_text(chart.left() + chart.width() - text_margin,
-                      chart.top() + chart.height() - text_margin, "-" + str_scale_target, true, true);
+            draw_text(chart.left() + chart.width() / 2 - text_margin, chart.top() + text_margin, "Combined");
+            draw_text(chart.left() + text_margin, chart.top() + text_margin, "+" + str_scale_target);
+            draw_text(chart.left() + text_margin,
+                      chart.top() + chart.height() - text_margin, "-" + str_scale_target, false, true);
         }
             break;
 
@@ -219,7 +219,7 @@ void M3MScopeApp::draw()
             break;
     }
 
-    draw_text(text_margin, screen_surface()->h - text_margin, m_net_text, false, true);
+    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text, true);
 
     SDL_Flip(screen_surface());
 }
