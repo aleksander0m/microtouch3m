@@ -4,7 +4,7 @@
 #include "Microtouch3MScopeApp.hpp"
 
 const static uint32_t FPS_LIMIT = 60;
-const static uint8_t BITS_PER_PIXEL = 32;
+const static uint8_t BITS_PER_PIXEL = 16;
 
 int main()
 {
