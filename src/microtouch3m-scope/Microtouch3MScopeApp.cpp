@@ -10,8 +10,9 @@
 
 #include "SDL_net.h"
 
-Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_limit) :
-    SDLApp(width, height, flags, fps_limit),
+Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
+                                           uint32_t fps_limit) :
+    SDLApp(width, height, bits_per_pixel, flags, fps_limit),
     m_sample_count(100),
     m_current_pos(0),
     m_title_update_time(0),

@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <cmath>
 
-SDLApp::SDLApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_limit) :
+SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit) :
     m_video_info(0),
     m_screen_surface(0),
     m_fps_limit(fps_limit),
@@ -13,7 +13,7 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_lim
     std::cout << "SDL version: " << SDL_MAJOR_VERSION
               << "." << SDL_MINOR_VERSION
               << "." << SDL_PATCHLEVEL
-              << std::endl;
+              << std::endl << std::endl;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -27,12 +27,14 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_lim
         throw std::runtime_error(std::string("Video query failed: ") + SDL_GetError());
     }
 
-    std::cout << "Video mode resolution: " << m_video_info->current_w << "x" << m_video_info->current_h << std::endl
-              << "hw_available: " << m_video_info->hw_available << std::endl
-              << "blit_hw: " << m_video_info->blit_hw << std::endl
-              << "blit_fill: " << m_video_info->blit_fill << std::endl
-              << "video_mem: " << m_video_info->video_mem << "K" << std::endl
-              << "BPP: " << (uint32_t) m_video_info->vfmt->BitsPerPixel << std::endl;
+    std::cout << "Video mode" << std::endl
+              << "\tresolution: \t" << m_video_info->current_w << "x" << m_video_info->current_h << std::endl
+              << "\thw_available: \t" << m_video_info->hw_available << std::endl
+              << "\tblit_hw: \t" << m_video_info->blit_hw << std::endl
+              << "\tblit_fill: \t" << m_video_info->blit_fill << std::endl
+              << "\tvideo_mem: \t" << m_video_info->video_mem << "K" << std::endl
+              << "\tBPP: \t" << (uint32_t) m_video_info->vfmt->BitsPerPixel << std::endl
+              << std::endl;
 
     if (width == 0 || height == 0)
     {
@@ -42,7 +44,12 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint32_t flags, uint32_t fps_lim
         height = (uint32_t) m_video_info->current_h;
     }
 
-    m_screen_surface = SDL_SetVideoMode(width, height, m_video_info->vfmt->BitsPerPixel, flags);
+    m_screen_surface = SDL_SetVideoMode(width, height, bits_per_pixel, flags);
+
+    std::cout << "Screen surface" << std::endl
+              << "\tResolution: \t" << m_screen_surface->w << "x" << m_screen_surface->h << std::endl
+              << "\tBPP: \t" << (uint32_t) m_screen_surface->format->BitsPerPixel << std::endl
+              << std::endl;
 
     if (m_screen_surface == 0)
     {

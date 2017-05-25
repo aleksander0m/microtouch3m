@@ -4,6 +4,7 @@
 #include "Microtouch3MScopeApp.hpp"
 
 const static uint32_t FPS_LIMIT = 60;
+const static uint8_t BITS_PER_PIXEL = 32;
 
 int main()
 {
@@ -21,7 +22,7 @@ int main()
 #endif
         ;
 
-        Microtouch3MScopeApp sdlApp(width, height, flags, FPS_LIMIT);
+        Microtouch3MScopeApp sdlApp(width, height, BITS_PER_PIXEL, flags, FPS_LIMIT);
 
 #if defined(IMX51)
         sdlApp.enable_cursor(false);
