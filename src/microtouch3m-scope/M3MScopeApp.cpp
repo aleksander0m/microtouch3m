@@ -1,4 +1,4 @@
-#include "Microtouch3MScopeApp.hpp"
+#include "M3MScopeApp.hpp"
 
 #include <sstream>
 #include <cmath>
@@ -10,8 +10,7 @@
 
 #include "SDL_net.h"
 
-Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
-                                           uint32_t fps_limit) :
+M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit) :
     SDLApp(width, height, bits_per_pixel, flags, fps_limit),
     m_sample_count(100),
     m_current_pos(0),
@@ -68,11 +67,11 @@ Microtouch3MScopeApp::Microtouch3MScopeApp(uint32_t width, uint32_t height, uint
     m_m3m_dev_mon_thread.start();
 }
 
-Microtouch3MScopeApp::~Microtouch3MScopeApp()
+M3MScopeApp::~M3MScopeApp()
 {
 }
 
-void Microtouch3MScopeApp::update(uint32_t delta_time)
+void M3MScopeApp::update(uint32_t delta_time)
 {
     if ((m_title_update_time += delta_time) > 1000)
     {
@@ -150,7 +149,7 @@ void Microtouch3MScopeApp::update(uint32_t delta_time)
     }
 }
 
-void Microtouch3MScopeApp::draw()
+void M3MScopeApp::draw()
 {
     SDL_FillRect(screen_surface(), 0, 0x00000000);
 
@@ -225,7 +224,7 @@ void Microtouch3MScopeApp::draw()
     SDL_Flip(screen_surface());
 }
 
-void Microtouch3MScopeApp::on_event(const SDL_Event &event)
+void M3MScopeApp::on_event(const SDL_Event &event)
 {
     switch (event.type)
     {
@@ -247,7 +246,7 @@ void Microtouch3MScopeApp::on_event(const SDL_Event &event)
     }
 }
 
-void Microtouch3MScopeApp::create_charts()
+void M3MScopeApp::create_charts()
 {
     const uint32_t margin = 10;
 
@@ -301,7 +300,7 @@ void Microtouch3MScopeApp::create_charts()
     }
 }
 
-void Microtouch3MScopeApp::draw_text(int32_t x, int32_t y, const std::string &text, bool align_right, bool align_bottom)
+void M3MScopeApp::draw_text(int32_t x, int32_t y, const std::string &text, bool align_right, bool align_bottom)
 {
     m_bmp_font_renderer.draw(screen_surface(), x, y, text, align_right, align_bottom);
 }

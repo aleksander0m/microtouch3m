@@ -9,7 +9,7 @@ microtouch3m_scope_SOURCES = \
 	Mutex.cpp Mutex.hpp \
 	M3MDevice.cpp M3MDevice.hpp \
 	BitmapFontRenderer.cpp BitmapFontRenderer.hpp \
-	Microtouch3MScopeApp.cpp Microtouch3MScopeApp.hpp \
+	M3MScopeApp.cpp M3MScopeApp.hpp \
 	SDLApp.cpp SDLApp.hpp \
 	SDLUtils.cpp SDLUtils.hpp \
 	Color.hpp \

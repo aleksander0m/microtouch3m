@@ -50,7 +50,7 @@ set(SOURCE_FILES
         Color.hpp
         SDLUtils.cpp
         SDLApp.cpp
-        Microtouch3MScopeApp.cpp
+        M3MScopeApp.cpp
         BitmapFontRenderer.cpp
         BitmapFontRenderer.hpp
         M3MDevice.cpp M3MDevice.hpp

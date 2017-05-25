@@ -6,12 +6,11 @@
 #include "BitmapFontRenderer.hpp"
 #include "M3MDevice.hpp"
 
-class Microtouch3MScopeApp : public SDLApp
+class M3MScopeApp : public SDLApp
 {
 public:
-    Microtouch3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
-                         uint32_t fps_limit);
-    virtual ~Microtouch3MScopeApp();
+    M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit);
+    virtual ~M3MScopeApp();
 
 protected:
     virtual void update(uint32_t delta_time);
