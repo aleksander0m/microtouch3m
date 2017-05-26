@@ -1522,6 +1522,7 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
 {
     microtouch3m_status_t st;
     bool                  continue_loop = true;
+    bool                  first_found = false;
 
     if (libusb_kernel_driver_active (dev->usbhandle, 0)) {
         microtouch3m_log ("kernel driver is active...");
@@ -1601,8 +1602,13 @@ microtouch3m_device_monitor_async_reports (microtouch3m_device_t                
                                        5000) != 0) {
             goto report_error;
         }
-        if (transferred != MAX_INTERRUPT_ENDPOINT_TRANSFER)
+        if (transferred != MAX_INTERRUPT_ENDPOINT_TRANSFER) {
+            if (!first_found) {
+                first_found = true;
+                continue;
+            }
             goto report_error;
+        }
         microtouch3m_log_buffer ("async report received", (uint8_t *) &report, transferred);
 
         if (libusb_interrupt_transfer (dev->usbhandle,
