@@ -12,6 +12,7 @@ microtouch3m_scope_SOURCES = \
 	M3MScopeApp.cpp M3MScopeApp.hpp \
 	SDLApp.cpp SDLApp.hpp \
 	SDLUtils.cpp SDLUtils.hpp \
+	Utils.cpp Utils.hpp \
 	Color.hpp \
 	LineChart.hpp \
 	main.cpp \
