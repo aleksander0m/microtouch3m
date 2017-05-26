@@ -3,7 +3,8 @@
 
 #include <iostream>
 #include <queue>
-#include "SDL_stdinc.h"
+
+#include <time.h>
 
 #include "microtouch3m.h"
 
@@ -83,7 +84,7 @@ private:
     M3MDevice *m_m3m_dev;
     std::queue<signal_t> m_signals;
     Mutex m_mut_signals;
-    uint64_t m_strays_update_time;
+    timespec m_strays_update_time;
 };
 
 #endif // MICROTOUCH3M_SCOPE_M3MDEVICE_HPP

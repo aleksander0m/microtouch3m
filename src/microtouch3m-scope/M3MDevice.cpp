@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cmath>
 
-#include <time.h>
+#include "Utils.hpp"
 
 #define PROCESS_IQ(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
 
@@ -147,7 +147,7 @@ bool M3MDeviceMonitorThread::run()
 {
     try
     {
-        m_strays_update_time = 0;
+        clock_gettime(CLOCK_REALTIME, &m_strays_update_time);
 
         m_m3m_dev = new M3MDevice();
 
@@ -192,16 +192,15 @@ bool M3MDeviceMonitorThread::monitor_async_reports_callback(microtouch3m_device_
     ((int64_t) lr_signal) - ((int64_t) thread->m_m3m_dev->m_lr_stray_signal)
     ));
 
-    timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
 
-    if (!thread->m_strays_update_time) thread->m_strays_update_time = (uint64_t) t.tv_nsec;
+    const timespec time_diff = Utils::timespec_diff(thread->m_strays_update_time, now);
 
-    const uint64_t nsec = (const uint64_t) t.tv_nsec;
-    if (nsec - thread->m_strays_update_time >= 500000000)
+    if (time_diff.tv_sec * 1000000000 + time_diff.tv_nsec >= 500000000)
     {
         thread->m_m3m_dev->read_strays();
-        thread->m_strays_update_time = nsec;
+        thread->m_strays_update_time = now;
     }
 
     return !thread->get_exit();
