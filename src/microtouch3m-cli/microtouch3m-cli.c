@@ -1670,7 +1670,7 @@ print_help (void)
             "  * The [LVL] value in --set-sensitivity-level may be any between 0 (min) and 6 (max).\n"
             "\n"
             "  * The [FREQ] value in --set-frequency is given in mHz, and may be any of:\n"
-            "    70135, 76953, 85285, 95703, 109096\n"
+            "    70135, 76953, 85286, 95703, 109096\n"
             "\n");
 }
 
