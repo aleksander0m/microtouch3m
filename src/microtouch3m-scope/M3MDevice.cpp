@@ -30,7 +30,9 @@ M3MDevice::M3MDevice() :
     m_ul_stray_signal(0),
     m_ur_stray_signal(0),
     m_ll_stray_signal(0),
-    m_lr_stray_signal(0)
+    m_lr_stray_signal(0),
+    m_fw_major(-1),
+    m_fw_minor(-1)
 {
     if (!(m_dev = microtouch3m_device_new_first(m_ctx.context())))
     {
@@ -59,20 +61,15 @@ void M3MDevice::open()
 
 void M3MDevice::print_info()
 {
-    microtouch3m_status_t st;
-
     {
-        uint8_t fw_maj, fw_min;
+        int fw_maj, fw_min;
 
-        if ((st = microtouch3m_device_query_controller_id(m_dev, 0, &fw_maj, &fw_min, 0, 0, 0, 0, 0))
-            != MICROTOUCH3M_STATUS_OK)
-        {
-            throw std::runtime_error("M3M: Couldn't query controller - "
-                                     + std::string(microtouch3m_status_to_string(st)));
-        }
+        get_fw_version(&fw_maj, &fw_min);
 
-        std::cout << "M3M: firmware version - " << (int) fw_maj << "." << (int) fw_min << std::endl;
+        std::cout << "M3M: firmware version - " << fw_maj << "." << fw_min << std::endl;
     }
+
+    microtouch3m_status_t st;
 
     {
         microtouch3m_device_frequency_t dev_freq;
@@ -113,6 +110,28 @@ void M3MDevice::read_strays()
     m_ur_stray_signal = PROCESS_IQ(ur_stray_i, ur_stray_q);
     m_ll_stray_signal = PROCESS_IQ(ll_stray_i, ll_stray_q);
     m_lr_stray_signal = PROCESS_IQ(lr_stray_i, lr_stray_q);
+}
+
+void M3MDevice::get_fw_version(int *major, int *minor)
+{
+    if (m_fw_major == -1 || m_fw_minor == -1)
+    {
+        microtouch3m_status_t st;
+        uint8_t fw_maj, fw_min;
+
+        if ((st = microtouch3m_device_query_controller_id(m_dev, 0, &fw_maj, &fw_min, 0, 0, 0, 0, 0))
+            != MICROTOUCH3M_STATUS_OK)
+        {
+            throw std::runtime_error("M3M: Couldn't query controller - "
+                                     + std::string(microtouch3m_status_to_string(st)));
+        }
+
+        m_fw_major = fw_maj;
+        m_fw_minor = fw_min;
+    }
+
+    if (major) *major = m_fw_major;
+    if (minor) *minor = m_fw_minor;
 }
 
 void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data)

@@ -40,6 +40,8 @@ BitmapFontRenderer::~BitmapFontRenderer()
 void BitmapFontRenderer::draw(SDL_Surface *surface, int32_t x, int32_t y, const std::string &text,
                               bool align_right, bool align_bottom)
 {
+    if (text.empty()) return;
+
     SDL_Rect src;
     src.w = (Uint16) s_font_w; src.h = (Uint16) s_font_h;
 
@@ -55,22 +57,37 @@ void BitmapFontRenderer::draw(SDL_Surface *surface, int32_t x, int32_t y, const 
         dst.y -= s_font_h * std::count(text.begin(), text.end(), '\n');
     }
 
-    for (int i = 0; i < text.size(); ++i)
-    {
-        const char letter = text[align_right ? text.size() - 1 - i : i];
+    // start/end of line
+    size_t sol = 0;
+    size_t eol = text.find_first_of('\n', sol);
 
-        if (letter == '\n')
+    if (eol == std::string::npos)
+    {
+        eol = text.size();
+    }
+
+    while (sol < text.size())
+    {
+        for (size_t i = sol; i < eol; ++i)
         {
-            dst.x = origin_x;
-            dst.y += s_font_h;
-            continue;
+            const char letter = text[align_right ? eol - i + sol - 1 : i];
+
+            map_rect_for_letter(&src, letter);
+
+            SDL_BlitSurface(m_font_surface, &src, surface, &dst);
+
+            dst.x += align_right ? -s_font_w : s_font_w;
         }
 
-        map_rect_for_letter(&src, letter);
+        sol = eol + 1;
 
-        SDL_BlitSurface(m_font_surface, &src, surface, &dst);
+        if ((eol = text.find_first_of('\n', sol)) == std::string::npos)
+        {
+            eol = text.size();
+        }
 
-        dst.x += align_right ? -s_font_w : s_font_w;
+        dst.x = origin_x;
+        dst.y += s_font_h;
     }
 }
 

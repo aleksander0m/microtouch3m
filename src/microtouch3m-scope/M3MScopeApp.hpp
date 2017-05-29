@@ -39,6 +39,8 @@ private:
     uint32_t m_scale_target;
     M3MLogger m_m3m_logger;
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;
+    std::string m_fw_string;
+    std::string m_scale_target_string;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

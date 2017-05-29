@@ -27,6 +27,20 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         m3m_dev.open();
         m3m_dev.print_info();
         std::cout << std::endl;
+
+        int fw_maj, fw_min;
+        m3m_dev.get_fw_version(&fw_maj, &fw_min);
+
+        std::ostringstream oss;
+        oss << "FW Version: " << fw_maj << "." << fw_min;
+        m_fw_string = oss.str();
+    }
+
+    {
+        std::ostringstream oss;
+        oss << m_scale_target;
+
+        m_scale_target_string = oss.str();
     }
 
     create_charts();
@@ -44,7 +58,12 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 
             std::cout << ipaddr << std::endl;
 
-            m_net_text += "\n" + ipaddr;
+            m_net_text += ipaddr + "\n";
+        }
+
+        if (!m_net_text.empty())
+        {
+            m_net_text.resize(m_net_text.size() - 1);
         }
 
         SDLNet_Quit();
@@ -184,11 +203,6 @@ void M3MScopeApp::draw()
 
     const int text_margin = 20;
 
-    std::ostringstream oss;
-    oss << m_scale_target;
-
-    const std::string str_scale_target(oss.str());
-
     switch (m_chart_mode)
     {
         case CHART_MODE_ONE:
@@ -196,9 +210,9 @@ void M3MScopeApp::draw()
             const LineChart<int> &chart = m_charts.at(0);
 
             draw_text(chart.left() + chart.width() / 2 - text_margin, chart.top() + text_margin, "Combined");
-            draw_text(chart.left() + text_margin, chart.top() + text_margin, "+" + str_scale_target);
+            draw_text(chart.left() + text_margin, chart.top() + text_margin, "+" + m_scale_target_string);
             draw_text(chart.left() + text_margin,
-                      chart.top() + chart.height() - text_margin, "-" + str_scale_target, false, true);
+                      chart.top() + chart.height() - text_margin, "-" + m_scale_target_string, false, true);
         }
             break;
 
@@ -213,9 +227,9 @@ void M3MScopeApp::draw()
                     const LineChart<int> &chart = m_charts.at(i);
 
                     draw_text(chart.left() + text_margin, chart.top() + text_margin, names[i]);
-                    draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+" + str_scale_target, true);
+                    draw_text(chart.left() + chart.width() - text_margin, chart.top() + text_margin, "+" + m_scale_target_string, true);
                     draw_text(chart.left() + chart.width() - text_margin,
-                              chart.top() + chart.height() - text_margin, "-" + str_scale_target, true, true);
+                              chart.top() + chart.height() - text_margin, "-" + m_scale_target_string, true, true);
                 }
             }
         }
@@ -223,7 +237,7 @@ void M3MScopeApp::draw()
             break;
     }
 
-    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text, true);
+    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_fw_string, true);
 
     SDL_Flip(screen_surface());
 }

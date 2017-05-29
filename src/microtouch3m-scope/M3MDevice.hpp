@@ -34,6 +34,7 @@ public:
     void open();
     void print_info();
     void read_strays();
+    void get_fw_version(int *major, int *minor);
     void monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data);
 private:
     M3MContext m_ctx;
@@ -43,6 +44,8 @@ private:
     uint64_t m_ur_stray_signal;
     uint64_t m_ll_stray_signal;
     uint64_t m_lr_stray_signal;
+    int m_fw_major;
+    int m_fw_minor;
 };
 
 class M3MDeviceMonitorThread : public Thread
