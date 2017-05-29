@@ -10,7 +10,8 @@
 
 #include "SDL_net.h"
 
-M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit) :
+M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
+                         uint32_t fps_limit, bool verbose) :
     SDLApp(width, height, bits_per_pixel, flags, fps_limit),
     m_sample_count(100),
     m_current_pos(0),
@@ -19,7 +20,7 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_net_text(""),
     m_scale_target(10000000)
 {
-    m_m3m_logger.enable(false);
+    m_m3m_logger.enable(verbose);
 
     // print m3m info, it will fail with exception when the device can't be found
     {
