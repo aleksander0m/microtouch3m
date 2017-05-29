@@ -12,16 +12,18 @@ static void print_help();
 
 int main(int argc, char *argv[])
 {
+    bool verbose = false;
+    int print_fps = 0;
+
     const option long_options[] = {
-    { "help",    no_argument, 0, 'h' },
+    { "help", no_argument, 0, 'h' },
     { "verbose", no_argument, 0, 'v' },
-    { 0, 0,                   0, 0 }
+    { "print-fps", no_argument, &print_fps, 1 },
+    { 0, 0, 0, 0 }
     };
 
     int idx;
     int iarg = 0;
-
-    bool verbose = false;
 
     while (iarg != -1)
     {
@@ -59,6 +61,8 @@ int main(int argc, char *argv[])
         sdlApp.enable_cursor(false);
 #endif
 
+        sdlApp.set_print_fps((bool) print_fps);
+
         return sdlApp.exec();
     }
     catch (const std::runtime_error &e)
@@ -72,7 +76,8 @@ int main(int argc, char *argv[])
 void print_help()
 {
     std::cout << std::endl
-              << "  -v, --verbose   Be verbose. Will enable microtouch3m log." << std::endl
-              << "  -h, --help      Show help." << std::endl
+              << "  -v, --verbose        Be verbose. Will enable microtouch3m log." << std::endl
+              << "  -h, --help           Show help." << std::endl
+              << "      --print-fps      Print FPS each second." << std::endl
               << std::endl;
 }

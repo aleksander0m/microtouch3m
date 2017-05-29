@@ -18,7 +18,8 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_title_update_time(0),
     m_chart_mode(CHART_MODE_ONE),
     m_net_text(""),
-    m_scale_target(10000000)
+    m_scale_target(10000000),
+    m_print_fps(false)
 {
     m_m3m_logger.enable(verbose);
 
@@ -95,22 +96,30 @@ M3MScopeApp::~M3MScopeApp()
 {
 }
 
+void M3MScopeApp::set_print_fps(bool enable)
+{
+    m_print_fps = enable;
+}
+
 void M3MScopeApp::update(uint32_t delta_time)
 {
-    if ((m_title_update_time += delta_time) > 1000)
+    if (m_print_fps)
     {
+        if ((m_title_update_time += delta_time) > 1000)
+        {
 #if !defined(IMX51)
-        std::ostringstream oss;
+            std::ostringstream oss;
 
-        oss << "microtouch-3m-scope - " << screen_surface()->w << "x" << screen_surface()->h
-            << " FPS: " << fps();
+            oss << "microtouch-3m-scope - " << screen_surface()->w << "x" << screen_surface()->h
+                << " FPS: " << fps();
 
-        SDL_WM_SetCaption(oss.str().c_str(), 0);
+            SDL_WM_SetCaption(oss.str().c_str(), 0);
 #endif
 
-        std::cout << "FPS " << fps() << std::endl;
+            std::cout << "FPS " << fps() << std::endl;
 
-        m_title_update_time = 0;
+            m_title_update_time = 0;
+        }
     }
 
     // update charts

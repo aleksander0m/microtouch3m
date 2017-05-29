@@ -14,6 +14,8 @@ public:
                 uint32_t fps_limit, bool verbose);
     virtual ~M3MScopeApp();
 
+    void set_print_fps(bool enable);
+
 protected:
     virtual void update(uint32_t delta_time);
     virtual void draw();
@@ -42,6 +44,7 @@ private:
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;
     std::string m_fw_string;
     std::string m_scale_target_string;
+    bool m_print_fps;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP
