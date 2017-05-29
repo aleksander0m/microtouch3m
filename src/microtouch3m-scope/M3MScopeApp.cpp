@@ -11,8 +11,8 @@
 #include "SDL_net.h"
 
 M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
-                         uint32_t fps_limit, bool verbose) :
-    SDLApp(width, height, bits_per_pixel, flags, fps_limit),
+                         uint32_t fps_limit, bool verbose, bool m3m_log) :
+    SDLApp(width, height, bits_per_pixel, flags, fps_limit, verbose),
     m_sample_count(100),
     m_current_pos(0),
     m_title_update_time(0),
@@ -21,14 +21,20 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_scale_target(10000000),
     m_print_fps(false)
 {
-    m_m3m_logger.enable(verbose);
+    m_m3m_logger.enable(m3m_log);
 
-    // print m3m info, it will fail with exception when the device can't be found
+    // print m3m info
+    // creating device will fail with exception when the device can't be found
     {
         M3MDevice m3m_dev;
         m3m_dev.open();
-        m3m_dev.print_info();
-        std::cout << std::endl;
+
+        if (verbose)
+        {
+            m3m_dev.print_info();
+
+            std::cout << std::endl;
+        }
 
         int fw_maj, fw_min;
         m3m_dev.get_fw_version(&fw_maj, &fw_min);
@@ -58,7 +64,10 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 
             if (ipaddr.compare("localhost") == 0) continue;
 
-            std::cout << ipaddr << std::endl;
+            if (verbose)
+            {
+                std::cout << ipaddr << std::endl;
+            }
 
             m_net_text += ipaddr + "\n";
         }

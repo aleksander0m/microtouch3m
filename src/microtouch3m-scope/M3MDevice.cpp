@@ -38,9 +38,6 @@ M3MDevice::M3MDevice() :
     {
         throw std::runtime_error("M3M: Getting device failed");
     }
-
-    std::cout << "M3M device: Bus " << (int) microtouch3m_device_get_usb_bus_number(m_dev)
-              << " Device " << (int) microtouch3m_device_get_usb_device_address(m_dev) << std::endl;
 }
 
 M3MDevice::~M3MDevice()
@@ -61,6 +58,9 @@ void M3MDevice::open()
 
 void M3MDevice::print_info()
 {
+    std::cout << "M3M device: Bus " << (int) microtouch3m_device_get_usb_bus_number(m_dev)
+              << " Device " << (int) microtouch3m_device_get_usb_device_address(m_dev) << std::endl;
+
     {
         int fw_maj, fw_min;
 

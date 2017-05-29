@@ -11,7 +11,7 @@ class M3MScopeApp : public SDLApp
 {
 public:
     M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
-                uint32_t fps_limit, bool verbose);
+                uint32_t fps_limit, bool verbose, bool m3m_log);
     virtual ~M3MScopeApp();
 
     void set_print_fps(bool enable);

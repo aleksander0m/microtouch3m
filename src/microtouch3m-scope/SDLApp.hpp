@@ -6,7 +6,7 @@
 class SDLApp
 {
 public:
-    SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit);
+    SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit, bool verbose);
     virtual ~SDLApp();
 
     int exec();

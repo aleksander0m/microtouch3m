@@ -22,6 +22,7 @@ protected:
     bool get_exit();
 
 private:
+    pthread_attr_t m_attr;
     pthread_t m_thr;
     bool m_exit;
     Mutex m_mut_exit;

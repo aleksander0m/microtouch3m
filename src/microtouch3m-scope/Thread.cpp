@@ -1,7 +1,10 @@
 #include "Thread.hpp"
 
+#include <cstring>
+
 Thread::Thread() : m_exit(false)
 {
+    memset(&m_attr, -1, sizeof(m_attr));
 }
 
 Thread::~Thread()
@@ -12,11 +15,18 @@ Thread::~Thread()
 
 void Thread::start()
 {
-    pthread_create(&m_thr, 0, Thread::thread_run, this);
+    pthread_attr_init(&m_attr);
+    pthread_create(&m_thr, &m_attr, Thread::thread_run, this);
 }
 
 void Thread::join()
 {
+    int detstate;
+
+    pthread_attr_getdetachstate(&m_attr, &detstate);
+
+    if (detstate != PTHREAD_CREATE_JOINABLE) return;
+
     pthread_join(m_thr, 0);
 }
 
