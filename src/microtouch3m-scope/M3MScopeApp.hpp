@@ -5,6 +5,7 @@
 #include "LineChart.hpp"
 #include "BitmapFontRenderer.hpp"
 #include "M3MDevice.hpp"
+#include "M3MLogger.hpp"
 
 class M3MScopeApp : public SDLApp
 {
@@ -36,6 +37,7 @@ private:
     BitmapFontRenderer m_bmp_font_renderer;
     std::string m_net_text;
     uint32_t m_scale_target;
+    M3MLogger m_m3m_logger;
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;
 };
 

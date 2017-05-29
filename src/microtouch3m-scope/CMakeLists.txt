@@ -56,7 +56,8 @@ set(SOURCE_FILES
         M3MDevice.cpp M3MDevice.hpp
         Thread.cpp Thread.hpp
         Mutex.cpp Mutex.hpp
-        Utils.cpp Utils.hpp)
+        Utils.cpp Utils.hpp
+        M3MLogger.cpp M3MLogger.hpp)
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 

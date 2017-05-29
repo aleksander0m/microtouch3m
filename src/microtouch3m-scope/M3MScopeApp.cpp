@@ -19,6 +19,8 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_net_text(""),
     m_scale_target(10000000)
 {
+    m_m3m_logger.enable(false);
+
     create_charts();
 
     if (SDLNet_Init() == 0)
