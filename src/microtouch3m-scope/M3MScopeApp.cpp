@@ -21,6 +21,14 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 {
     m_m3m_logger.enable(false);
 
+    // print m3m info, it will fail with exception when the device can't be found
+    {
+        M3MDevice m3m_dev;
+        m3m_dev.open();
+        m3m_dev.print_info();
+        std::cout << std::endl;
+    }
+
     create_charts();
 
     if (SDLNet_Init() == 0)
@@ -59,12 +67,6 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         }
     }
 #endif
-
-//    {
-//        M3MDevice m3m_dev;
-//        m3m_dev.print_info();
-//        std::cout << std::endl;
-//    }
 
     m_m3m_dev_mon_thread.start();
 }
