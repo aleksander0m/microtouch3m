@@ -41,6 +41,8 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         std::ostringstream oss;
         oss << "FW Version: " << fw_maj << "." << fw_min;
         m_fw_string = oss.str();
+
+        m_frequency_string = "Frequency: " + m3m_dev.get_frequency_string();
     }
 
     set_scale(10000000);
@@ -260,7 +262,8 @@ void M3MScopeApp::draw()
             break;
     }
 
-    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_fw_string, true);
+    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_fw_string
+                                                              + "\n" + m_frequency_string, true);
 
     SDL_Flip(screen_surface());
 }

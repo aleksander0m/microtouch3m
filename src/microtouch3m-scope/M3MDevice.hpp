@@ -35,6 +35,7 @@ public:
     void print_info();
     void read_strays();
     void get_fw_version(int *major, int *minor);
+    std::string get_frequency_string();
     void monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data);
 private:
     M3MContext m_ctx;
@@ -46,6 +47,7 @@ private:
     uint64_t m_lr_stray_signal;
     int m_fw_major;
     int m_fw_minor;
+    std::string m_frequency_str;
 };
 
 class M3MDeviceMonitorThread : public Thread

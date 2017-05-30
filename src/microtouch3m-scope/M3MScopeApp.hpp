@@ -46,6 +46,7 @@ private:
     std::string m_fw_string;
     std::string m_scale_target_string;
     bool m_print_fps;
+    std::string m_frequency_string;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

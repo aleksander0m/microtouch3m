@@ -69,19 +69,7 @@ void M3MDevice::print_info()
         std::cout << "M3M: firmware version - " << fw_maj << "." << fw_min << std::endl;
     }
 
-    microtouch3m_status_t st;
-
-    {
-        microtouch3m_device_frequency_t dev_freq;
-
-        if ((st = microtouch3m_device_get_frequency(m_dev, &dev_freq)) != MICROTOUCH3M_STATUS_OK)
-        {
-            throw std::runtime_error("M3M: Couldn't get frequency - "
-                                     + std::string(microtouch3m_status_to_string(st)));
-        }
-
-        std::cout << "M3M: frequency - " << microtouch3m_device_frequency_to_string(dev_freq) << std::endl;
-    }
+    std::cout << "M3M: frequency - " << get_frequency_string() << std::endl;
 }
 
 void M3MDevice::read_strays()
@@ -132,6 +120,26 @@ void M3MDevice::get_fw_version(int *major, int *minor)
 
     if (major) *major = m_fw_major;
     if (minor) *minor = m_fw_minor;
+}
+
+std::string M3MDevice::get_frequency_string()
+{
+    if (m_frequency_str.empty())
+    {
+        microtouch3m_status_t st;
+
+        microtouch3m_device_frequency_t dev_freq;
+
+        if ((st = microtouch3m_device_get_frequency(m_dev, &dev_freq)) != MICROTOUCH3M_STATUS_OK)
+        {
+            throw std::runtime_error("M3M: Couldn't get frequency - "
+                                     + std::string(microtouch3m_status_to_string(st)));
+        }
+
+        m_frequency_str = microtouch3m_device_frequency_to_string(dev_freq);
+    }
+
+    return m_frequency_str;
 }
 
 void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data)
