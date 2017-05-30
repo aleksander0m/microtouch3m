@@ -23,6 +23,16 @@ public:
             data.insert(data.begin(), fill_count, fill_value);
         }
 
+        size_t data_count() const
+        {
+            return data.size();
+        }
+
+        T get(typename std::vector<T>::size_type pos) const
+        {
+            return data.at(pos);
+        }
+
         void set(typename std::vector<T>::size_type pos, T value)
         {
             data.at(pos) = value;
@@ -42,6 +52,11 @@ public:
         m_curves.push_back(Curve(color, fill_count, fill_value));
 
         return m_curves.back();
+    }
+
+    size_t curves_count() const
+    {
+        return m_curves.size();
     }
 
     Curve &curve(typename std::vector<Curve>::size_type i)
@@ -84,7 +99,7 @@ public:
             for (int i = 0; i < curve.data.size(); ++i)
             {
                 const int y = curve.data.at(i);
-                const int x = w_step * i;
+                const int x = (const int) (w_step * i);
 
                 if (i == 0)
                 {

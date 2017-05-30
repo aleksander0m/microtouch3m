@@ -18,12 +18,18 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_title_update_time(0),
     m_chart_mode(chart_mode),
     m_net_text(""),
-    m_print_fps(false)
+    m_print_fps(false),
+    m_upd_start(0),
+    m_upd_end(0),
+    m_chart_prog(0.0f),
+    m_old_chart_prog(0.0f),
+    m_clear_color(Color(0, 0, 0).map_rgb(screen_surface()->format))
 {
     m_m3m_logger.enable(m3m_log);
 
     // print m3m info
     // creating device will fail with exception when the device can't be found
+#ifndef TEST_VALUES
     {
         M3MDevice m3m_dev;
         m3m_dev.open();
@@ -44,6 +50,7 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 
         m_frequency_string = "Frequency: " + m3m_dev.get_frequency_string();
     }
+#endif
 
     set_scale(10000000);
 
@@ -94,7 +101,9 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     }
 #endif
 
+#ifndef TEST_VALUES
     m_m3m_dev_mon_thread.start();
+#endif
 }
 
 M3MScopeApp::~M3MScopeApp()
@@ -141,19 +150,25 @@ void M3MScopeApp::update(uint32_t delta_time)
 
     M3MDeviceMonitorThread::signal_t sig;
 
+    m_upd_start = m_upd_end;
+
+#ifndef TEST_VALUES
     while (m_m3m_dev_mon_thread.pop_signal(sig))
+#endif
     {
         const double scale = (double) (screen_surface()->h / 2 - 10) / m_scale_target;
 
+#ifdef TEST_VALUES
+        int val0 = (int) (sin(SDL_GetTicks() * 0.01) * 100 - 190);
+        int val1 = (int) (cos(SDL_GetTicks() * 0.05) * 50 + 50);
+        int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
+        int val3 = (int) (m_current_pos % 30 - 100);
+#else
         int val0 = (int) (sig.ul_corrected_signal * scale);
         int val1 = (int) (sig.ur_corrected_signal * scale);
         int val2 = (int) (sig.ll_corrected_signal * scale);
         int val3 = (int) (sig.lr_corrected_signal * scale);
-
-//        int val0 = (int) (sin(SDL_GetTicks() * 0.01) * 100 - 190);
-//        int val1 = (int) (cos(SDL_GetTicks() * 0.05) * 50 + 50);
-//        int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
-//        int val3 = (int) (m_current_pos % 30 - 100);
+#endif
 
         switch (m_chart_mode)
         {
@@ -191,15 +206,64 @@ void M3MScopeApp::update(uint32_t delta_time)
         ++m_current_pos;
     }
 
+    m_upd_end = (uint32_t) ((m_current_pos - 1) % m_sample_count);
+
+    m_old_chart_prog = m_chart_prog;
+    m_chart_prog = (float) (m_current_pos % m_sample_count) / m_sample_count;
+
     for (std::vector<LineChart<int> >::iterator it = m_charts.begin(); it != m_charts.end(); ++it)
     {
-        it->set_progress((float) (m_current_pos % m_sample_count) / m_sample_count);
+        it->set_progress(m_chart_prog);
     }
 }
 
 void M3MScopeApp::draw()
 {
-    SDL_FillRect(screen_surface(), 0, 0x00000000);
+    // screen clearing optimization - only for one chart mode
+    switch (m_chart_mode)
+    {
+        case CHART_MODE_ONE:
+        {
+//            m_clear_color = Color((uint8_t) (rand() % 256), (uint8_t) (rand() % 256), (uint8_t) (rand() % 256))
+//                            .map_rgb(screen_surface()->format);
+
+            SDL_Rect bounds;
+
+            if ((m_upd_start == m_upd_end && m_upd_start == 0) || m_upd_end < m_upd_start)
+            {
+                bounds.x = 0;
+                bounds.y = 0;
+                bounds.w = (Uint16) screen_surface()->w;
+                bounds.h = (Uint16) screen_surface()->h;
+            }
+            else
+            {
+                LineChart<int> &chart = m_charts.front();
+
+                const float w_step = (float) chart.width() / (m_sample_count - 1);
+                const int sx = (const int) (w_step * m_upd_start) + chart.left();
+                const int ex = (const int) (w_step * m_upd_end) + chart.left();
+
+                bounds.x = sx;
+                bounds.y = chart.top();
+                bounds.w = (Uint16) (ex - sx + 1);
+                bounds.h = (Uint16) screen_surface()->h;
+
+                // clear old progress line
+                sdl_utils::draw_line(screen_surface(),
+                                     (int32_t) (chart.left() + chart.width() * m_old_chart_prog), chart.top(),
+                                     (int32_t) (chart.left() + chart.width() * m_old_chart_prog), chart.top() + chart.height(),
+                                     0);
+            }
+
+            SDL_FillRect(screen_surface(), &bounds, m_clear_color);
+        }
+            break;
+
+        case CHART_MODE_FOUR:
+            SDL_FillRect(screen_surface(), 0, m_clear_color);
+            break;
+    }
 
     if (SDL_MUSTLOCK(screen_surface()))
     {
@@ -247,7 +311,7 @@ void M3MScopeApp::draw()
             {
                 static const char *names[] = { "UL", "UR", "LL", "LR" };
 
-                for (int i = 0; i < m_charts.size(); ++i)
+                for (size_t i = 0; i < m_charts.size(); ++i)
                 {
                     const LineChart<int> &chart = m_charts.at(i);
 

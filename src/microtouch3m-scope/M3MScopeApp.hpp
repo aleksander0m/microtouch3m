@@ -47,6 +47,11 @@ private:
     std::string m_scale_target_string;
     bool m_print_fps;
     std::string m_frequency_string;
+    uint32_t m_upd_start;
+    uint32_t m_upd_end;
+    float m_chart_prog;
+    float m_old_chart_prog;
+    Uint32 m_clear_color;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP
