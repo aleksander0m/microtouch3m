@@ -1,13 +1,13 @@
 #include <iostream>
+#include <cmath>
+#include <sstream>
 #include <stdexcept>
 
 #include <getopt.h>
-#include <cmath>
 
 #include "M3MScopeApp.hpp"
 
 const static uint32_t FPS_LIMIT = 60;
-const static uint8_t BITS_PER_PIXEL = 16;
 
 static void print_help();
 
@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
     int print_fps = 0;
     int m3m_log = 0;
     uint32_t scale = 10000000;
+    uint16_t bits_per_pixel = 0;
 
     const option long_options[] = {
     { "help",      no_argument,       0,          'h' },
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
     { "print-fps", no_argument,       &print_fps, 1 },
     { "m3m-log",   no_argument,       &m3m_log,   1 },
     { "scale",     required_argument, 0,          's' },
+    { "bpp",       required_argument, 0,          'b' },
     { 0, 0,                           0,          0 }
     };
 
@@ -32,10 +34,13 @@ int main(int argc, char *argv[])
 
     while (iarg != -1)
     {
-        iarg = getopt_long(argc, argv, "hvs:", long_options, &idx);
+        iarg = getopt_long(argc, argv, "hvs:b:", long_options, &idx);
 
         switch (iarg)
         {
+            default:
+                break;
+
             case '?':
             case 'h':
                 print_help();
@@ -92,15 +97,28 @@ int main(int argc, char *argv[])
                 }
             }
                 break;
+
+            case 'b':
+            {
+                std::istringstream(optarg) >> bits_per_pixel;
+
+                if (bits_per_pixel != 0 && (bits_per_pixel < 8 || bits_per_pixel > 32))
+                {
+                    std::cerr << "Invalid bpp argument: " << optarg << std::endl;
+                    return 1;
+                }
+            }
+
+                break;
         }
     }
 
     try
     {
 #if defined(IMX51)
-        int width = 0; int height = 0;
+        uint32_t width = 0; uint32_t height = 0;
 #else
-        int width = 1280; int height = 800;
+        uint32_t width = 1280; uint32_t height = 800;
 #endif
 
         Uint32 flags = SDL_SWSURFACE
@@ -109,7 +127,7 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, BITS_PER_PIXEL, flags, FPS_LIMIT, verbose, m3m_log);
+        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, FPS_LIMIT, verbose, (bool) m3m_log);
 
 #if defined(IMX51)
         sdlApp.enable_cursor(false);
@@ -137,5 +155,6 @@ void print_help()
               << "      --m3m-log        Enable microtouch3m log." << std::endl
               << "  -s, --scale          Min/max value of chart in [10K, 999999999] range." << std::endl
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
+              << "  --bpp                Bits per pixel. Default: 0 (autodetect)." << std::endl
               << std::endl;
 }
