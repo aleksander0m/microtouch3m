@@ -10,8 +10,15 @@
 class M3MScopeApp : public SDLApp
 {
 public:
+
+    enum ChartMode
+    {
+        CHART_MODE_ONE,
+        CHART_MODE_FOUR
+    };
+
     M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit,
-                bool verbose, bool m3m_log, uint32_t samples);
+                bool verbose, bool m3m_log, uint32_t samples, ChartMode chart_mode);
     virtual ~M3MScopeApp();
 
     void set_print_fps(bool enable);
@@ -23,13 +30,6 @@ protected:
     virtual void on_event(const SDL_Event &event);
 
 private:
-
-    enum ChartMode
-    {
-        CHART_MODE_ONE,
-        CHART_MODE_FOUR
-    };
-
     void create_charts();
     void draw_text(int32_t x, int32_t y, const std::string &text, bool align_right = false, bool align_bottom = false);
 

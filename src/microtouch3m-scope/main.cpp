@@ -1,7 +1,13 @@
 #include <iostream>
 #include <cmath>
 #include <sstream>
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedImportStatement"
+
 #include <stdexcept>
+
+#pragma clang diagnostic pop
 
 #include <getopt.h>
 
@@ -23,17 +29,19 @@ int main(int argc, char *argv[])
     uint16_t bits_per_pixel = 0;
     uint32_t samples = 100;
     uint32_t fps_limit = 60;
+    int four_charts = 0;
 
     const option long_options[] = {
-    { "help",      no_argument,       0,          'h' },
-    { "verbose",   no_argument,       0,          'v' },
-    { "print-fps", no_argument,       &print_fps, 1 },
-    { "m3m-log",   no_argument,       &m3m_log,   1 },
-    { "scale",     required_argument, 0,          's' },
-    { "bpp",       required_argument, 0,          'b' },
-    { "samples",   required_argument, 0,          'k' },
-    { "fps-limit", required_argument, 0,          OPT_FPS_LIMIT },
-    { 0, 0,                           0,          0 }
+    { "help",        no_argument,       0,            'h' },
+    { "verbose",     no_argument,       0,            'v' },
+    { "print-fps",   no_argument,       &print_fps,   1 },
+    { "m3m-log",     no_argument,       &m3m_log,     1 },
+    { "scale",       required_argument, 0,            's' },
+    { "bpp",         required_argument, 0,            'b' },
+    { "samples",     required_argument, 0,            'k' },
+    { "fps-limit",   required_argument, 0,            OPT_FPS_LIMIT },
+    { "four-charts", no_argument,       &four_charts, 1 },
+    { 0, 0,                             0,            0 }
     };
 
     int idx;
@@ -151,7 +159,8 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, (bool) m3m_log, samples);
+        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, (bool) m3m_log, samples,
+                           four_charts ? M3MScopeApp::CHART_MODE_FOUR : M3MScopeApp::CHART_MODE_ONE);
 
 #if defined(IMX51)
         sdlApp.enable_cursor(false);
@@ -182,5 +191,6 @@ void print_help()
               << "  --bpp                Bits per pixel. Default: 0 (autodetect)." << std::endl
               << "  -k, --samples        Number of samples in charts." << std::endl
               << "  --fps-limit          FPS limit." << std::endl
+              << "  --four-charts        Draw four charts." << std::endl
               << std::endl;
 }
