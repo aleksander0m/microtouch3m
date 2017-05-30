@@ -10,10 +10,10 @@
 
 #include "SDL_net.h"
 
-M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
-                         uint32_t fps_limit, bool verbose, bool m3m_log) :
+M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit,
+                         bool verbose, bool m3m_log, uint32_t samples) :
     SDLApp(width, height, bits_per_pixel, flags, fps_limit, verbose),
-    m_sample_count(100),
+    m_sample_count(samples),
     m_current_pos(0),
     m_title_update_time(0),
     m_chart_mode(CHART_MODE_ONE),

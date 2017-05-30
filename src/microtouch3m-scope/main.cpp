@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
     int m3m_log = 0;
     uint32_t scale = 10000000;
     uint16_t bits_per_pixel = 0;
+    uint32_t samples = 100;
 
     const option long_options[] = {
     { "help",      no_argument,       0,          'h' },
@@ -26,6 +27,7 @@ int main(int argc, char *argv[])
     { "m3m-log",   no_argument,       &m3m_log,   1 },
     { "scale",     required_argument, 0,          's' },
     { "bpp",       required_argument, 0,          'b' },
+    { "samples",   required_argument, 0,          'k' },
     { 0, 0,                           0,          0 }
     };
 
@@ -34,7 +36,7 @@ int main(int argc, char *argv[])
 
     while (iarg != -1)
     {
-        iarg = getopt_long(argc, argv, "hvs:b:", long_options, &idx);
+        iarg = getopt_long(argc, argv, "hvs:b:k:", long_options, &idx);
 
         switch (iarg)
         {
@@ -110,6 +112,16 @@ int main(int argc, char *argv[])
             }
 
                 break;
+
+            case 'k':
+                std::istringstream(optarg) >> samples;
+
+                if (samples < 1 || samples > 10000)
+                {
+                    std::cerr << "Invalid samples argument: " << optarg << std::endl;
+                    return 1;
+                }
+                break;
         }
     }
 
@@ -127,7 +139,7 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, FPS_LIMIT, verbose, (bool) m3m_log);
+        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, FPS_LIMIT, verbose, (bool) m3m_log, samples);
 
 #if defined(IMX51)
         sdlApp.enable_cursor(false);
@@ -156,5 +168,6 @@ void print_help()
               << "  -s, --scale          Min/max value of chart in [10K, 999999999] range." << std::endl
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
               << "  --bpp                Bits per pixel. Default: 0 (autodetect)." << std::endl
+              << "  -k, --samples        Number of samples in charts." << std::endl
               << std::endl;
 }
