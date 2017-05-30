@@ -7,9 +7,12 @@
 
 #include "M3MScopeApp.hpp"
 
-const static uint32_t FPS_LIMIT = 60;
-
 static void print_help();
+
+enum Options
+{
+    OPT_FPS_LIMIT = 1000
+};
 
 int main(int argc, char *argv[])
 {
@@ -19,6 +22,7 @@ int main(int argc, char *argv[])
     uint32_t scale = 10000000;
     uint16_t bits_per_pixel = 0;
     uint32_t samples = 100;
+    uint32_t fps_limit = 60;
 
     const option long_options[] = {
     { "help",      no_argument,       0,          'h' },
@@ -28,6 +32,7 @@ int main(int argc, char *argv[])
     { "scale",     required_argument, 0,          's' },
     { "bpp",       required_argument, 0,          'b' },
     { "samples",   required_argument, 0,          'k' },
+    { "fps-limit", required_argument, 0,          OPT_FPS_LIMIT },
     { 0, 0,                           0,          0 }
     };
 
@@ -101,7 +106,6 @@ int main(int argc, char *argv[])
                 break;
 
             case 'b':
-            {
                 std::istringstream(optarg) >> bits_per_pixel;
 
                 if (bits_per_pixel != 0 && (bits_per_pixel < 8 || bits_per_pixel > 32))
@@ -109,8 +113,6 @@ int main(int argc, char *argv[])
                     std::cerr << "Invalid bpp argument: " << optarg << std::endl;
                     return 1;
                 }
-            }
-
                 break;
 
             case 'k':
@@ -119,6 +121,16 @@ int main(int argc, char *argv[])
                 if (samples < 1 || samples > 10000)
                 {
                     std::cerr << "Invalid samples argument: " << optarg << std::endl;
+                    return 1;
+                }
+                break;
+
+            case OPT_FPS_LIMIT:
+                std::istringstream(optarg) >> fps_limit;
+
+                if (fps_limit < 1 || fps_limit > 1000)
+                {
+                    std::cerr << "Invalid fps-limit argument: " << optarg << std::endl;
                     return 1;
                 }
                 break;
@@ -139,7 +151,7 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, FPS_LIMIT, verbose, (bool) m3m_log, samples);
+        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, (bool) m3m_log, samples);
 
 #if defined(IMX51)
         sdlApp.enable_cursor(false);
@@ -169,5 +181,6 @@ void print_help()
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
               << "  --bpp                Bits per pixel. Default: 0 (autodetect)." << std::endl
               << "  -k, --samples        Number of samples in charts." << std::endl
+              << "  --fps-limit          FPS limit." << std::endl
               << std::endl;
 }
