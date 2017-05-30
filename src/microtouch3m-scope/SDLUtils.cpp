@@ -59,6 +59,12 @@ void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32
 
 void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_t x1, int32_t y1, Uint32 color)
 {
+    if ((y0 < m_clip_y0 && y1 < m_clip_y0) || (y0 > m_clip_y1 && y1 > m_clip_y1)
+        || (x0 < m_clip_x0 && x1 < m_clip_x0) || (x0 > m_clip_x1 && x1 > m_clip_x1))
+    {
+        return;
+    }
+
     const bool steep = (abs(y1 - y0) > abs(x1 - x0));
 
     if (steep)

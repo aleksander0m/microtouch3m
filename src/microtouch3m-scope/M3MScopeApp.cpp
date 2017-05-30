@@ -18,7 +18,6 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_title_update_time(0),
     m_chart_mode(CHART_MODE_ONE),
     m_net_text(""),
-    m_scale_target(10000000),
     m_print_fps(false)
 {
     m_m3m_logger.enable(m3m_log);
@@ -44,12 +43,7 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         m_fw_string = oss.str();
     }
 
-    {
-        std::ostringstream oss;
-        oss << m_scale_target;
-
-        m_scale_target_string = oss.str();
-    }
+    set_scale(10000000);
 
     create_charts();
 
@@ -108,6 +102,16 @@ M3MScopeApp::~M3MScopeApp()
 void M3MScopeApp::set_print_fps(bool enable)
 {
     m_print_fps = enable;
+}
+
+void M3MScopeApp::set_scale(uint32_t scale)
+{
+    m_scale_target = scale;
+
+    std::ostringstream oss;
+    oss << m_scale_target;
+
+    m_scale_target_string = oss.str();
 }
 
 void M3MScopeApp::update(uint32_t delta_time)

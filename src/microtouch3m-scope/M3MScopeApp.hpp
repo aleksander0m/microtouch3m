@@ -15,6 +15,7 @@ public:
     virtual ~M3MScopeApp();
 
     void set_print_fps(bool enable);
+    void set_scale(uint32_t scale);
 
 protected:
     virtual void update(uint32_t delta_time);
