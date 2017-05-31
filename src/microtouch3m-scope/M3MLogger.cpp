@@ -12,8 +12,10 @@ M3MLogger::~M3MLogger()
 
 void M3MLogger::log_handler(pthread_t thread_id, const char *message)
 {
-    std::cout << "microtouch3m_log: (0x" << std::hex << thread_id << std::dec << ") "
+    std::ios::fmtflags f(std::cout.flags());
+    std::cout << "microtouch3m_log: (" << std::showbase << std::hex << thread_id << std::dec << std::noshowbase << ") "
               << std::string(message) << std::endl;
+    std::cout.flags(f);
 }
 
 void M3MLogger::enable(bool e)

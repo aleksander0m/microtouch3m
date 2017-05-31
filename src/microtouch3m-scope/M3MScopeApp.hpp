@@ -43,10 +43,9 @@ private:
     uint32_t m_scale_target;
     M3MLogger m_m3m_logger;
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;
-    std::string m_fw_string;
+    std::string m_static_text_string;
     std::string m_scale_target_string;
     bool m_print_fps;
-    std::string m_frequency_string;
     uint32_t m_upd_start;
     uint32_t m_upd_end;
     float m_chart_prog;

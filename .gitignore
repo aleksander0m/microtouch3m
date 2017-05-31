@@ -5,6 +5,8 @@
 *.log
 *.trs
 
+*.swp
+
 Makefile
 Makefile.in
 .deps

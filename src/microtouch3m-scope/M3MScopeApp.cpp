@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cmath>
 #include <cstring>
+#include <iomanip>
 
 #if defined(IMX51)
 #include <fcntl.h>
@@ -44,11 +45,23 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         int fw_maj, fw_min;
         m3m_dev.get_fw_version(&fw_maj, &fw_min);
 
-        std::ostringstream oss;
-        oss << "FW Version: " << fw_maj << "." << fw_min;
-        m_fw_string = oss.str();
+        {
+            std::ostringstream oss0;
+            oss0 << fw_maj << "." << fw_min;
+            const std::string fw = oss0.str();
+            const std::string label_fw = "FW Version: ";
 
-        m_frequency_string = "Frequency: " + m3m_dev.get_frequency_string();
+            const std::string freq = m3m_dev.get_frequency_string();
+            const std::string label_freq = "Frequency: ";
+
+            std::ostringstream oss;
+            const int w1 = (const int) std::max(label_fw.length(), label_freq.length());
+            const int w2 = (const int) std::max(fw.length(), freq.length());
+            oss << std::left << std::setw(w1) << label_fw << std::right << std::setw(w2) << fw << std::endl
+                << std::left << std::setw(w1) << label_freq << std::right << std::setw(w2) << freq << std::endl;
+
+            m_static_text_string = oss.str();
+        }
     }
 #endif
 
@@ -332,8 +345,7 @@ void M3MScopeApp::draw()
             break;
     }
 
-    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_fw_string
-                                                              + "\n" + m_frequency_string, true);
+    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_static_text_string, true);
 
     SDL_Flip(screen_surface());
 }
