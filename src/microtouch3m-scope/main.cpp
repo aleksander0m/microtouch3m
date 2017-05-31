@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     int print_fps = 0;
     int m3m_log = 0;
     uint32_t scale = 10000000;
-    uint16_t bits_per_pixel = 0;
+    uint16_t bits_per_pixel = 16;
     uint32_t samples = 100;
     uint32_t fps_limit = 60;
     int four_charts = 0;
@@ -188,7 +188,7 @@ void print_help()
               << "      --m3m-log        Enable microtouch3m log." << std::endl
               << "  -s, --scale          Min/max value of chart in [10K, 999999999] range." << std::endl
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
-              << "  --bpp                Bits per pixel. Default: 0 (autodetect)." << std::endl
+              << "  --bpp                Bits per pixel. Default: 16." << std::endl
               << "  -k, --samples        Number of samples in charts." << std::endl
               << "  --fps-limit          FPS limit." << std::endl
               << "  --four-charts        Draw four charts." << std::endl
