@@ -142,24 +142,22 @@ int SDLApp::exec()
             last_fps_ticks = SDL_GetTicks();
         }
 
-        // sleep until next frame to keep CPU load sane
+        // flip after VSYNC
 
         if (m_vsync)
         {
             ioctl(m_fbdev, FBIO_WAITFORVSYNC, 0);
-
-            SDL_Flip(screen_surface());
         }
-        else
+
+        SDL_Flip(screen_surface());
+
+        // sleep until next frame to keep CPU load sane
+
+        int32_t frame_time_remaining = (int32_t) round(1000.0 / m_fps_limit - (SDL_GetTicks() - iteration_start));
+
+        if (frame_time_remaining > 0)
         {
-            SDL_Flip(screen_surface());
-
-            int32_t frame_time_remaining = (int32_t) round(1000.0 / m_fps_limit - (SDL_GetTicks() - iteration_start));
-
-            if (frame_time_remaining > 0)
-            {
-                SDL_Delay((Uint32) frame_time_remaining);
-            }
+            SDL_Delay((Uint32) frame_time_remaining);
         }
 
         last_iteration_start = iteration_start;

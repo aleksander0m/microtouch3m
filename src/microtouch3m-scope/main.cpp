@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     uint32_t scale = 10000000;
     uint16_t bits_per_pixel = 16;
     uint32_t samples = 100;
-    uint32_t fps_limit = 60;
+    uint32_t fps_limit = 1000;
     int four_charts = 0;
     int no_vsync = 0;
 
@@ -195,6 +195,6 @@ void print_help()
               << "  -k, --samples        Number of samples in charts." << std::endl
               << "  --fps-limit          FPS limit." << std::endl
               << "  --four-charts        Draw four charts." << std::endl
-              << "  --no-vsync           Disable VSYNC and use FPS limiting instead." << std::endl
+              << "  --no-vsync           Disable VSYNC." << std::endl
               << std::endl;
 }
