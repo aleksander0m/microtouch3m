@@ -65,6 +65,11 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     }
 #endif
 
+    m_strays_text_rect.x = screen_surface()->w / 2 + 20;
+    m_strays_text_rect.y = screen_surface()->h - 40;
+    m_strays_text_rect.w = (Uint16) (screen_surface()->w - m_strays_text_rect.x - 20);
+    m_strays_text_rect.h = (Uint16) (screen_surface()->h - m_strays_text_rect.y - 20);
+
     set_scale(10000000);
 
     create_charts();
@@ -177,10 +182,12 @@ void M3MScopeApp::update(uint32_t delta_time)
         int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
         int val3 = (int) (m_current_pos % 30 - 100);
 #else
-        int val0 = (int) (sig.ul_corrected_signal * scale);
-        int val1 = (int) (sig.ur_corrected_signal * scale);
-        int val2 = (int) (sig.ll_corrected_signal * scale);
-        int val3 = (int) (sig.lr_corrected_signal * scale);
+        int val0 = (int) (sig.ul * scale);
+        int val1 = (int) (sig.ur * scale);
+        int val2 = (int) (sig.ll * scale);
+        int val3 = (int) (sig.lr * scale);
+
+        m_strays = m_m3m_dev_mon_thread.strays();
 #endif
 
         switch (m_chart_mode)
@@ -270,6 +277,18 @@ void M3MScopeApp::draw()
             }
 
             SDL_FillRect(screen_surface(), &bounds, m_clear_color);
+
+            // clear strays text area
+            if (m_strays != m_prev_strays)
+            {
+                std::ostringstream oss;
+                oss << m_strays.ul << " " << m_strays.ur << " " << m_strays.ll << " " << m_strays.lr;
+                m_strays_text_string = oss.str();
+
+                SDL_FillRect(screen_surface(), &m_strays_text_rect, m_clear_color);
+
+                m_prev_strays = m_strays;
+            }
         }
             break;
 
@@ -346,6 +365,8 @@ void M3MScopeApp::draw()
     }
 
     draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_static_text_string, true);
+
+    draw_text(m_strays_text_rect.x, m_strays_text_rect.y, m_strays_text_string);
 
     SDL_Flip(screen_surface());
 }

@@ -51,6 +51,10 @@ private:
     float m_chart_prog;
     float m_old_chart_prog;
     Uint32 m_clear_color;
+    M3MDeviceMonitorThread::signal_t m_strays;
+    M3MDeviceMonitorThread::signal_t m_prev_strays;
+    SDL_Rect m_strays_text_rect;
+    std::string m_strays_text_string;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

@@ -55,31 +55,38 @@ class M3MDeviceMonitorThread : public Thread
 public:
     struct signal_t
     {
-        signal_t() :
-        ul_corrected_signal(0),
-        ur_corrected_signal(0),
-        ll_corrected_signal(0),
-        lr_corrected_signal(0)
+        signal_t() : ul(0), ur(0), ll(0), lr(0)
         {}
 
-        signal_t(int64_t ul, int64_t ur, int64_t ll, int64_t lr) :
-        ul_corrected_signal(ul),
-        ur_corrected_signal(ur),
-        ll_corrected_signal(ll),
-        lr_corrected_signal(lr)
+        signal_t(int64_t ul, int64_t ur, int64_t ll, int64_t lr) : ul(ul), ur(ur), ll(ll), lr(lr)
         {}
 
-        int64_t ul_corrected_signal;
-        int64_t ur_corrected_signal;
-        int64_t ll_corrected_signal;
-        int64_t lr_corrected_signal;
+        bool operator==(const signal_t &sig)
+        {
+            return this->ul == sig.ul
+                   && this->ur == sig.ur
+                   && this->ll == sig.ll
+                   && this->lr == sig.lr;
+        }
+
+        bool operator!=(const signal_t &sig)
+        {
+            return !(*this == sig);
+        }
+
+        int64_t ul;
+        int64_t ur;
+        int64_t ll;
+        int64_t lr;
     };
 
     bool pop_signal(signal_t &sig);
+    signal_t strays();
 
 private:
 
     void push_signal(const signal_t &sig);
+    void set_strays(const signal_t &sig);
     virtual bool run();
 
     static bool monitor_async_reports_callback(microtouch3m_device_t *dev, microtouch3m_status_t status, int32_t ul_i,
@@ -90,6 +97,8 @@ private:
     std::queue<signal_t> m_signals;
     Mutex m_mut_signals;
     timespec m_strays_update_time;
+    Mutex m_mut_strays;
+    signal_t m_strays;
 };
 
 #endif // MICROTOUCH3M_SCOPE_M3MDEVICE_HPP

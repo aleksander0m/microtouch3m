@@ -164,10 +164,26 @@ bool M3MDeviceMonitorThread::pop_signal(M3MDeviceMonitorThread::signal_t &sig)
     return false;
 }
 
+M3MDeviceMonitorThread::signal_t M3MDeviceMonitorThread::strays()
+{
+    signal_t strays;
+    {
+        MutexLock lock(&m_mut_strays);
+        strays = m_strays;
+    }
+    return strays;
+}
+
 void M3MDeviceMonitorThread::push_signal(const M3MDeviceMonitorThread::signal_t &sig)
 {
     MutexLock lock(&m_mut_signals);
     m_signals.push(sig);
+}
+
+void M3MDeviceMonitorThread::set_strays(const M3MDeviceMonitorThread::signal_t &sig)
+{
+    MutexLock lock(&m_mut_strays);
+    m_strays = sig;
 }
 
 bool M3MDeviceMonitorThread::run()
@@ -213,10 +229,10 @@ bool M3MDeviceMonitorThread::monitor_async_reports_callback(microtouch3m_device_
     const uint64_t lr_signal = PROCESS_IQ(lr_i, lr_q);
 
     thread->push_signal(signal_t(
-    ((int64_t) ul_signal) - ((int64_t) thread->m_m3m_dev->m_ul_stray_signal),
-    ((int64_t) ur_signal) - ((int64_t) thread->m_m3m_dev->m_ur_stray_signal),
-    ((int64_t) ll_signal) - ((int64_t) thread->m_m3m_dev->m_ll_stray_signal),
-    ((int64_t) lr_signal) - ((int64_t) thread->m_m3m_dev->m_lr_stray_signal)
+        ((int64_t) ul_signal) - ((int64_t) thread->m_m3m_dev->m_ul_stray_signal),
+        ((int64_t) ur_signal) - ((int64_t) thread->m_m3m_dev->m_ur_stray_signal),
+        ((int64_t) ll_signal) - ((int64_t) thread->m_m3m_dev->m_ll_stray_signal),
+        ((int64_t) lr_signal) - ((int64_t) thread->m_m3m_dev->m_lr_stray_signal)
     ));
 
     timespec now;
@@ -228,6 +244,13 @@ bool M3MDeviceMonitorThread::monitor_async_reports_callback(microtouch3m_device_
     {
         thread->m_m3m_dev->read_strays();
         thread->m_strays_update_time = now;
+
+        thread->set_strays(signal_t(
+            thread->m_m3m_dev->m_ul_stray_signal,
+            thread->m_m3m_dev->m_ur_stray_signal,
+            thread->m_m3m_dev->m_ll_stray_signal,
+            thread->m_m3m_dev->m_lr_stray_signal
+        ));
     }
 
     return !thread->get_exit();
