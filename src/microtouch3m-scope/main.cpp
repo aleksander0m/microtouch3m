@@ -30,6 +30,7 @@ int main(int argc, char *argv[])
     uint32_t samples = 100;
     uint32_t fps_limit = 60;
     int four_charts = 0;
+    int no_vsync = 0;
 
     const option long_options[] = {
     { "help",        no_argument,       0,            'h' },
@@ -41,6 +42,7 @@ int main(int argc, char *argv[])
     { "samples",     required_argument, 0,            'k' },
     { "fps-limit",   required_argument, 0,            OPT_FPS_LIMIT },
     { "four-charts", no_argument,       &four_charts, 1 },
+    { "no-vsync",    no_argument,       &no_vsync,    1 },
     { 0, 0,                             0,            0 }
     };
 
@@ -159,7 +161,8 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, (bool) m3m_log, samples,
+        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, !no_vsync,
+                           (bool) m3m_log, samples,
                            four_charts ? M3MScopeApp::CHART_MODE_FOUR : M3MScopeApp::CHART_MODE_ONE);
 
 #if defined(IMX51)
@@ -192,5 +195,6 @@ void print_help()
               << "  -k, --samples        Number of samples in charts." << std::endl
               << "  --fps-limit          FPS limit." << std::endl
               << "  --four-charts        Draw four charts." << std::endl
+              << "  --no-vsync           Disable VSYNC and use FPS limiting instead." << std::endl
               << std::endl;
 }

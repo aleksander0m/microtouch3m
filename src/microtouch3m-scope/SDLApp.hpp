@@ -6,7 +6,8 @@
 class SDLApp
 {
 public:
-    SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit, bool verbose);
+    SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit,
+           bool verbose, bool vsync);
     virtual ~SDLApp();
 
     int exec();
@@ -29,7 +30,8 @@ private:
 
     uint32_t m_fps_limit;
     uint32_t m_fps;
-
+    int m_fbdev;
+    bool m_vsync;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_SDLAPP_HPP

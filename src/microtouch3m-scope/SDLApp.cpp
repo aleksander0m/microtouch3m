@@ -4,11 +4,22 @@
 #include <stdexcept>
 #include <cmath>
 
-SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit, bool verbose) :
+#include <linux/fb.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+
+#ifndef FBIO_WAITFORVSYNC
+#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
+#endif
+
+SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit,
+               bool verbose, bool vsync) :
     m_video_info(0),
     m_screen_surface(0),
     m_fps_limit(fps_limit),
-    m_fps(0)
+    m_fps(0),
+    m_fbdev(-1),
+    m_vsync(vsync)
 {
     if (verbose)
     {
@@ -66,6 +77,12 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t
     if (m_screen_surface == 0)
     {
         throw std::runtime_error(std::string("Video mode set failed: ") + SDL_GetError());
+    }
+
+    if ((m_fbdev = open("/dev/fb0", O_RDWR)) <= 0)
+    {
+        std::cerr << "ERROR could not read /dev/fb0. VSYNC disabled." << std::endl;
+        m_vsync = false;
     }
 }
 
@@ -127,7 +144,16 @@ int SDLApp::exec()
 
         // sleep until next frame to keep CPU load sane
 
+        if (m_vsync)
         {
+            ioctl(m_fbdev, FBIO_WAITFORVSYNC, 0);
+
+            SDL_Flip(screen_surface());
+        }
+        else
+        {
+            SDL_Flip(screen_surface());
+
             int32_t frame_time_remaining = (int32_t) round(1000.0 / m_fps_limit - (SDL_GetTicks() - iteration_start));
 
             if (frame_time_remaining > 0)

@@ -11,9 +11,10 @@
 
 #include "SDL_net.h"
 
-M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags, uint32_t fps_limit,
-                         bool verbose, bool m3m_log, uint32_t samples, ChartMode chart_mode) :
-    SDLApp(width, height, bits_per_pixel, flags, fps_limit, verbose),
+M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
+                         uint32_t fps_limit, bool verbose, bool vsync, bool m3m_log, uint32_t samples,
+                         ChartMode chart_mode) :
+    SDLApp(width, height, bits_per_pixel, flags, fps_limit, verbose, vsync),
     m_sample_count(samples),
     m_current_pos(0),
     m_title_update_time(0),
@@ -367,8 +368,6 @@ void M3MScopeApp::draw()
     draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_static_text_string, true);
 
     draw_text(m_strays_text_rect.x, m_strays_text_rect.y, m_strays_text_string);
-
-    SDL_Flip(screen_surface());
 }
 
 void M3MScopeApp::on_event(const SDL_Event &event)
