@@ -65,12 +65,6 @@ PKG_CHECK_MODULES([SDL], [sdl >= $SDL_REQUIRED_VERSION], [have_sdl=yes], [have_s
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
-dnl sdl net required for scope
-SDLNET_REQUIRED_VERSION=1.2.8
-PKG_CHECK_MODULES([SDLNET], [SDL_net >= $SDLNET_REQUIRED_VERSION], [have_sdlnet=yes], [have_sdlnet=no])
-AC_SUBST(SDLNET_CFLAGS)
-AC_SUBST(SDLNET_LIBS)
-
 dnl sdl image required for scope
 SDLIMAGE_REQUIRED_VERSION=1.2.12
 PKG_CHECK_MODULES([SDLIMAGE], [SDL_image >= $SDLIMAGE_REQUIRED_VERSION], [have_sdlimage=yes], [have_sdlimage=no])
@@ -106,8 +100,6 @@ AC_ARG_ENABLE([scope],
 if test "x$build_scope" = "xyes"; then
    if test "x$have_sdl" = "xno"; then
        AC_MSG_ERROR([Couldn't find sdl1 >= ${SDL_REQUIRED_VERSION}. Install it, or otherwise configure using --disable-scope to disable building `microtouch3m-scope'.])
-   elif test "x$have_sdlnet" = "xno"; then
-       AC_MSG_ERROR([Couldn't find sdl net >= ${SDLNET_REQUIRED_VERSION}. Install it, or otherwise configure using --disable-scope to disable building `microtouch3m-scope'.])
    elif test "x$have_sdlimage" = "xno"; then
        AC_MSG_ERROR([Couldn't find sdl image >= ${SDLIMAGE_REQUIRED_VERSION}. Install it, or otherwise configure using --disable-scope to disable building `microtouch3m-scope'.])
    fi

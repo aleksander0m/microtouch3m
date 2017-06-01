@@ -38,12 +38,6 @@ if (NOT SDL_IMAGE_FOUND)
     message(FATAL_ERROR "SDL_image Not found")
 endif()
 
-find_package(SDL_net 1.2.8 REQUIRED)
-
-if (NOT SDL_NET_FOUND)
-    message(FATAL_ERROR "SDL_net Not found")
-endif()
-
 set(SOURCE_FILES
         main.cpp
         LineChart.hpp
@@ -63,4 +57,4 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 include_directories(${SDL_INCLUDE_DIR} ${SDL_IMAGE_INCLUDE_DIR} ${SDL_NET_INCLUDE_DIR})
 
-target_link_libraries(${PROJECT_NAME} ${SDL_LIBRARY} ${SDL_IMAGE_LIBRARY} ${SDL_NET_LIBRARY} ${MICROTOUCH3M_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${SDL_LIBRARY} ${SDL_IMAGE_LIBRARY} ${MICROTOUCH3M_LIBRARY})

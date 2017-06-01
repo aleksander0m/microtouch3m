@@ -1,6 +1,8 @@
 #ifndef MICROTOUCH3M_SCOPE_UTILS_HPP
 #define MICROTOUCH3M_SCOPE_UTILS_HPP
 
+#include <string>
+
 #include <time.h>
 
 namespace Utils {
@@ -21,6 +23,8 @@ namespace Utils {
 
         return ret;
     }
+
+    std::string ipv4_string();
 };
 
 #endif // MICROTOUCH3M_SCOPE_UTILS_HPP

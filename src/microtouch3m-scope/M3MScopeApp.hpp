@@ -41,7 +41,6 @@ private:
     uint32_t m_title_update_time;
     ChartMode m_chart_mode;
     BitmapFontRenderer m_bmp_font_renderer;
-    std::string m_net_text;
     uint32_t m_scale_target;
     M3MLogger m_m3m_logger;
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;

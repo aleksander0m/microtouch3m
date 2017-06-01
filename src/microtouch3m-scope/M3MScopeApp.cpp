@@ -4,12 +4,13 @@
 #include <cmath>
 #include <cstring>
 #include <iomanip>
+#include <algorithm>
 
 #if defined(IMX51)
 #include <fcntl.h>
 #endif
 
-#include "SDL_net.h"
+#include "Utils.hpp"
 
 M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
                          uint32_t fps_limit, bool verbose, bool vsync, bool m3m_log, uint32_t samples,
@@ -19,7 +20,6 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_current_pos(0),
     m_title_update_time(0),
     m_chart_mode(chart_mode),
-    m_net_text(""),
     m_print_fps(false),
     m_upd_start(0),
     m_upd_end(0),
@@ -47,18 +47,31 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         m3m_dev.get_fw_version(&fw_maj, &fw_min);
 
         {
+            std::vector<size_t> len_value, len_label;
+
+            const std::string ip = Utils::ipv4_string();
+            const std::string label_ip = "IP: ";
+            len_value.push_back(ip.length());
+            len_label.push_back(label_ip.length());
+
             std::ostringstream oss0;
             oss0 << fw_maj << "." << fw_min;
             const std::string fw = oss0.str();
             const std::string label_fw = "FW Version: ";
+            len_value.push_back(fw.length());
+            len_label.push_back(label_fw.length());
 
             const std::string freq = m3m_dev.get_frequency_string();
             const std::string label_freq = "Frequency: ";
+            len_value.push_back(freq.length());
+            len_label.push_back(label_freq.length());
+
+            const int w1 = (const int) *std::max_element(len_label.begin(), len_label.end());
+            const int w2 = (const int) *std::max_element(len_value.begin(), len_value.end());
 
             std::ostringstream oss;
-            const int w1 = (const int) std::max(label_fw.length(), label_freq.length());
-            const int w2 = (const int) std::max(fw.length(), freq.length());
-            oss << std::left << std::setw(w1) << label_fw << std::right << std::setw(w2) << fw << std::endl
+            oss << std::left << std::setw(w1) << label_ip << std::right << std::setw(w2) << ip << std::endl
+                << std::left << std::setw(w1) << label_fw << std::right << std::setw(w2) << fw << std::endl
                 << std::left << std::setw(w1) << label_freq << std::right << std::setw(w2) << freq << std::endl;
 
             m_static_text_string = oss.str();
@@ -74,33 +87,6 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     set_scale(10000000);
 
     create_charts();
-
-    if (SDLNet_Init() == 0)
-    {
-        IPaddress adr[10];
-        int num = SDLNet_GetLocalAddresses(adr, 10);
-
-        for (int i = 0; i < num; ++i)
-        {
-            const std::string ipaddr(SDLNet_ResolveIP(&adr[i]));
-
-            if (ipaddr.compare("localhost") == 0) continue;
-
-            if (verbose)
-            {
-                std::cout << ipaddr << std::endl;
-            }
-
-            m_net_text += ipaddr + "\n";
-        }
-
-        if (!m_net_text.empty())
-        {
-            m_net_text.resize(m_net_text.size() - 1);
-        }
-
-        SDLNet_Quit();
-    }
 
 #if defined(IMX51)
     {
@@ -365,7 +351,7 @@ void M3MScopeApp::draw()
             break;
     }
 
-    draw_text(screen_surface()->w - text_margin, text_margin, m_net_text + "\n" + m_static_text_string, true);
+    draw_text(screen_surface()->w - text_margin, text_margin, m_static_text_string, true);
 
     draw_text(m_strays_text_rect.x, m_strays_text_rect.y, m_strays_text_string);
 }
