@@ -7,6 +7,9 @@ Mutex::Mutex()
 
 Mutex::~Mutex()
 {
+    lock();
+    unlock();
+
     pthread_mutex_destroy(&m_mut);
 }
 
