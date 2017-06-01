@@ -84,7 +84,7 @@ public:
     };
 
     bool pop_signal(signal_t &sig);
-    signal_t strays();
+    signal_t get_strays();
 
 private:
 

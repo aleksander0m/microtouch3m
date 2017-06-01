@@ -174,7 +174,7 @@ bool M3MDeviceMonitorThread::pop_signal(M3MDeviceMonitorThread::signal_t &sig)
     return false;
 }
 
-M3MDeviceMonitorThread::signal_t M3MDeviceMonitorThread::strays()
+M3MDeviceMonitorThread::signal_t M3MDeviceMonitorThread::get_strays()
 {
     signal_t strays;
     {

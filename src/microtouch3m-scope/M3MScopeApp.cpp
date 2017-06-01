@@ -177,7 +177,7 @@ void M3MScopeApp::update(uint32_t delta_time)
         int val2 = (int) (sig.ll * scale);
         int val3 = (int) (sig.lr * scale);
 
-        m_strays = m_m3m_dev_mon_thread.strays();
+        m_strays = m_m3m_dev_mon_thread.get_strays();
 #endif
 
         switch (m_chart_mode)
