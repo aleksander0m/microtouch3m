@@ -49,8 +49,6 @@ std::string Utils::ipv4_string()
             goto exit;
         }
 
-        std::cout << "Interface " << it->ifa_name << " has IPv4 address: " << host << std::endl;
-
         ret = host;
         goto exit;
     }
