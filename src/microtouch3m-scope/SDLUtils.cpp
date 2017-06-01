@@ -65,6 +65,25 @@ void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_
         return;
     }
 
+    if (x0 == x1)
+    {
+        if (y0 > y1) std::swap(y0, y1);
+
+        for (int y = y0; y < y1; ++y)
+            set_pixel(surface, x0, y, color);
+
+        return;
+    }
+    else if (y0 == y1)
+    {
+        if (x0 > x1) std::swap(x0, x1);
+
+        for (int x = x0; x < x1; ++x)
+            set_pixel(surface, x, y0, color);
+
+        return;
+    }
+
     const bool steep = (abs(y1 - y0) > abs(x1 - x0));
 
     if (steep)
