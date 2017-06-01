@@ -105,10 +105,6 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
         }
     }
 #endif
-
-#ifndef TEST_VALUES
-    m_m3m_dev_mon_thread.start();
-#endif
 }
 
 M3MScopeApp::~M3MScopeApp()
@@ -128,6 +124,13 @@ void M3MScopeApp::set_scale(uint32_t scale)
     oss << m_scale_target;
 
     m_scale_target_string = oss.str();
+}
+
+void M3MScopeApp::on_start()
+{
+#ifndef TEST_VALUES
+    m_m3m_dev_mon_thread.start();
+#endif
 }
 
 void M3MScopeApp::update(uint32_t delta_time)

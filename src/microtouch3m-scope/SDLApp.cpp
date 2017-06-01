@@ -100,6 +100,8 @@ int SDLApp::exec()
     m_exit_code = 0;
     m_exit = false;
 
+    on_start();
+
     while (!m_exit)
     {
         Uint32 iteration_start = SDL_GetTicks();

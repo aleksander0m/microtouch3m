@@ -27,6 +27,7 @@ public:
     void set_scale(uint32_t scale);
 
 protected:
+    virtual void on_start();
     virtual void update(uint32_t delta_time);
     virtual void draw();
     virtual void on_event(const SDL_Event &event);

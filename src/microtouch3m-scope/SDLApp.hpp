@@ -17,6 +17,7 @@ public:
 protected:
     SDL_Surface *screen_surface() const;
 
+    virtual void on_start() = 0;
     virtual void update(uint32_t delta_time) = 0;
     virtual void draw() = 0;
     virtual void on_event(const SDL_Event &event) = 0;
