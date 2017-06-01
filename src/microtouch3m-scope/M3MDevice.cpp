@@ -153,7 +153,9 @@ void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *
 }
 
 M3MDeviceMonitorThread::M3MDeviceMonitorThread() :
-    Thread()
+    Thread(),
+    m_signals_r(&m_signals0),
+    m_signals_w(&m_signals1)
 { }
 
 M3MDeviceMonitorThread::~M3MDeviceMonitorThread()
@@ -162,16 +164,11 @@ M3MDeviceMonitorThread::~M3MDeviceMonitorThread()
     join();
 }
 
-bool M3MDeviceMonitorThread::pop_signal(M3MDeviceMonitorThread::signal_t &sig)
+std::queue<M3MDeviceMonitorThread::signal_t> *M3MDeviceMonitorThread::get_signals_r()
 {
     MutexLock lock(&m_mut_signals);
-    if (!m_signals.empty())
-    {
-        sig = m_signals.front();
-        m_signals.pop();
-        return true;
-    }
-    return false;
+    std::swap(m_signals_r, m_signals_w);
+    return m_signals_r;
 }
 
 M3MDeviceMonitorThread::signal_t M3MDeviceMonitorThread::get_strays()
@@ -187,7 +184,7 @@ M3MDeviceMonitorThread::signal_t M3MDeviceMonitorThread::get_strays()
 void M3MDeviceMonitorThread::push_signal(const M3MDeviceMonitorThread::signal_t &sig)
 {
     MutexLock lock(&m_mut_signals);
-    m_signals.push(sig);
+    m_signals_w->push(sig);
 }
 
 void M3MDeviceMonitorThread::set_strays(const M3MDeviceMonitorThread::signal_t &sig)

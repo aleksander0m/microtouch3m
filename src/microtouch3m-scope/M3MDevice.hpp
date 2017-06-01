@@ -83,7 +83,7 @@ public:
         int64_t lr;
     };
 
-    bool pop_signal(signal_t &sig);
+    std::queue<signal_t> *get_signals_r();
     signal_t get_strays();
 
 private:
@@ -97,7 +97,7 @@ private:
                                                int32_t lr_i, int32_t lr_q, void *user_data);
 
     M3MDevice *m_m3m_dev;
-    std::queue<signal_t> m_signals;
+    std::queue<signal_t> m_signals0, m_signals1, *m_signals_r, *m_signals_w;
     Mutex m_mut_signals;
     timespec m_strays_update_time;
     Mutex m_mut_strays;

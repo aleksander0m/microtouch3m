@@ -156,12 +156,12 @@ void M3MScopeApp::update(uint32_t delta_time)
 
     // update charts
 
-    M3MDeviceMonitorThread::signal_t sig;
-
     m_upd_start = m_upd_end;
 
 #ifndef TEST_VALUES
-    while (m_m3m_dev_mon_thread.pop_signal(sig))
+    std::queue<M3MDeviceMonitorThread::signal_t> * const signals = m_m3m_dev_mon_thread.get_signals_r();
+
+    while (!signals->empty())
 #endif
     {
         const double scale = (double) (screen_surface()->h / 2 - 10) / m_scale_target;
@@ -172,6 +172,9 @@ void M3MScopeApp::update(uint32_t delta_time)
         int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
         int val3 = (int) (m_current_pos % 30 - 100);
 #else
+        M3MDeviceMonitorThread::signal_t sig = signals->front();
+        signals->pop();
+
         int val0 = (int) (sig.ul * scale);
         int val1 = (int) (sig.ur * scale);
         int val2 = (int) (sig.ll * scale);
