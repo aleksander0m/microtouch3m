@@ -1,8 +1,9 @@
 #include "Thread.hpp"
 
 #include <cstring>
+#include <stdexcept>
 
-Thread::Thread() : m_exit(false)
+Thread::Thread() : m_exit(false), m_started(false), m_joined(false)
 {
     memset(&m_attr, -1, sizeof(m_attr));
 }
@@ -16,18 +17,33 @@ Thread::~Thread()
 void Thread::start()
 {
     pthread_attr_init(&m_attr);
-    pthread_create(&m_thr, &m_attr, Thread::thread_run, this);
+
+    int error;
+    if ((error = pthread_create(&m_thr, &m_attr, Thread::thread_run, this)))
+    {
+        throw std::runtime_error("Couldn't create thread: " + std::string(strerror(error)));
+    }
+
+    m_started = true;
 }
 
 void Thread::join()
 {
+    if (!m_started || m_joined) return;
+
     int detstate;
 
     pthread_attr_getdetachstate(&m_attr, &detstate);
 
     if (detstate != PTHREAD_CREATE_JOINABLE) return;
 
-    pthread_join(m_thr, 0);
+    int error;
+    if ((error = pthread_join(m_thr, 0)))
+    {
+        throw std::runtime_error("Couldn't join thread: " + std::string(strerror(error)));
+    }
+
+    m_joined = true;
 }
 
 void Thread::exit()

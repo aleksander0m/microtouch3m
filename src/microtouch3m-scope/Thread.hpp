@@ -26,6 +26,7 @@ private:
     pthread_t m_thr;
     bool m_exit;
     Mutex m_mut_exit;
+    bool m_started, m_joined;
 
     static void *thread_run(void *arg);
 };

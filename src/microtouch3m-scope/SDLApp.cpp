@@ -81,7 +81,7 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t
 
     if ((m_fbdev = open("/dev/fb0", O_RDWR)) <= 0)
     {
-        std::cerr << "ERROR could not read /dev/fb0. VSYNC disabled." << std::endl;
+        std::cerr << "Couldn't read /dev/fb0. VSYNC disabled." << std::endl;
         m_vsync = false;
     }
 }
