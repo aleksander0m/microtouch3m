@@ -1,5 +1,8 @@
 #include "Mutex.hpp"
 
+#include <stdexcept>
+#include <cstring>
+
 Mutex::Mutex()
 {
     pthread_mutex_init(&m_mut, 0);
@@ -10,17 +13,29 @@ Mutex::~Mutex()
     lock();
     unlock();
 
-    pthread_mutex_destroy(&m_mut);
+    int error;
+    if ((error = pthread_mutex_destroy(&m_mut)))
+    {
+        throw std::runtime_error("Couldn't destroy mutex: " + std::string(strerror(error)));
+    }
 }
 
 void Mutex::lock()
 {
-    pthread_mutex_lock(&m_mut);
+    int error;
+    if ((error = pthread_mutex_lock(&m_mut)))
+    {
+        throw std::runtime_error("Couldn't lock mutex: " + std::string(strerror(error)));
+    }
 }
 
 void Mutex::unlock()
 {
-    pthread_mutex_unlock(&m_mut);
+    int error;
+    if ((error = pthread_mutex_unlock(&m_mut)))
+    {
+        throw std::runtime_error("Couldn't unlock mutex: " + std::string(strerror(error)));
+    }
 }
 
 MutexLock::MutexLock(Mutex *m) : m_mutex(m)
