@@ -53,6 +53,9 @@ private:
 class M3MDeviceMonitorThread : public Thread
 {
 public:
+    M3MDeviceMonitorThread();
+    virtual ~M3MDeviceMonitorThread();
+
     struct signal_t
     {
         signal_t() : ul(0), ur(0), ll(0), lr(0)

@@ -152,6 +152,16 @@ void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *
     }
 }
 
+M3MDeviceMonitorThread::M3MDeviceMonitorThread() :
+    Thread()
+{ }
+
+M3MDeviceMonitorThread::~M3MDeviceMonitorThread()
+{
+    exit();
+    join();
+}
+
 bool M3MDeviceMonitorThread::pop_signal(M3MDeviceMonitorThread::signal_t &sig)
 {
     MutexLock lock(&m_mut_signals);
