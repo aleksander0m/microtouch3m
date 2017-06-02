@@ -8,14 +8,12 @@ void ::sdl_utils::set_clip_area(int x = 0, int y = 0, int width = 999999, int he
 {
     m_clip_x0 = x;
     m_clip_y0 = y;
-    m_clip_x1 = m_clip_x0 + width;
-    m_clip_y1 = m_clip_y0 + height;
+    m_clip_x1 = m_clip_x0 + width - 1;
+    m_clip_y1 = m_clip_y0 + height - 1;
 }
 
 void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32 color)
 {
-    if (x >= surface->w || y >= surface->h) return;
-
     if (x < m_clip_x0 || x > m_clip_x1 || y < m_clip_y0 || y > m_clip_y1) return;
 
     const int bpp = surface->format->BytesPerPixel;

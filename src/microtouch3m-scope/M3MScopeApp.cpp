@@ -232,6 +232,8 @@ void M3MScopeApp::update(uint32_t delta_time)
 
 void M3MScopeApp::draw()
 {
+    sdl_utils::set_clip_area(0, 0, screen_surface()->w, screen_surface()->h);
+
     // screen clearing optimization - only for one chart mode
     switch (m_chart_mode)
     {

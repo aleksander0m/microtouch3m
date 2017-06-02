@@ -44,7 +44,7 @@ public:
         std::vector<T> data;
     };
 
-    LineChart() : m_width(0), m_height(0), m_left(0), m_top(0), m_progress(0.0f)
+    LineChart() : m_width(0), m_height(0), m_left(0), m_top(0), m_right(0), m_bottom(0), m_progress(0.0f)
     {}
 
     Curve &add_curve(const Color &color, typename std::vector<T>::size_type fill_count, T fill_value)
@@ -75,6 +75,9 @@ public:
         m_top = top;
         m_width = width;
         m_height = height;
+
+        m_right = m_left + m_width - 1;
+        m_bottom = m_top + m_height - 1;
     }
 
     void draw(SDL_Surface *surface)
@@ -122,21 +125,21 @@ public:
 
         sdl_utils::draw_line(surface,
                             m_left, m_top,
-                            m_left + m_width, m_top,
+                            m_right, m_top,
                             col_border);
 
         sdl_utils::draw_line(surface,
-                            m_left + m_width, m_top,
-                            m_left + m_width, m_top + m_height,
+                            m_right, m_top,
+                            m_right, m_bottom,
                             col_border);
 
         sdl_utils::draw_line(surface,
-                            m_left + m_width, m_top + m_height,
-                            m_left, m_top + m_height,
+                            m_right, m_bottom,
+                            m_left, m_bottom,
                             col_border);
 
         sdl_utils::draw_line(surface,
-                            m_left, m_top + m_height,
+                            m_left, m_bottom,
                             m_left, m_top,
                             col_border);
 
@@ -191,7 +194,8 @@ public:
 
 protected:
     uint32_t m_width, m_height;
-    int m_left, m_top;
+    int32_t m_left, m_top;
+    int32_t m_right, m_bottom;
     float m_progress;
     std::vector<Curve> m_curves;
 };
