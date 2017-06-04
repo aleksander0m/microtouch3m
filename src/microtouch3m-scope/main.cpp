@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
             case 'k':
                 std::istringstream(optarg) >> samples;
 
-                if (samples < 1 || samples > 10000)
+                if (samples < 2 || samples > 10000)
                 {
                     std::cerr << "Invalid samples argument: " << optarg << std::endl;
                     return 1;
@@ -189,10 +189,10 @@ void print_help()
               << "  -h, --help           Show help." << std::endl
               << "      --print-fps      Print FPS each second." << std::endl
               << "      --m3m-log        Enable microtouch3m log." << std::endl
-              << "  -s, --scale          Min/max value of chart in [10K, 999999999] range." << std::endl
+              << "  -s, --scale          Min/max value of chart in [10K; 999999999] range." << std::endl
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
               << "  --bpp                Bits per pixel. Default: 16." << std::endl
-              << "  -k, --samples        Number of samples in charts." << std::endl
+              << "  -k, --samples        Number of samples in charts. Values in range [2; 10000] are accepted." << std::endl
               << "  --fps-limit          FPS limit." << std::endl
               << "  --four-charts        Draw four charts." << std::endl
               << "  --no-vsync           Disable VSYNC." << std::endl
