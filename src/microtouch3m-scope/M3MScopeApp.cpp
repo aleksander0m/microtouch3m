@@ -55,7 +55,7 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
             len_label.push_back(label_ip.length());
 
             std::ostringstream oss0;
-            oss0 << fw_maj << "." << fw_min;
+            oss0 << std::hex << fw_maj << "." << fw_min;
             const std::string fw = oss0.str();
             const std::string label_fw = "FW Version: ";
             len_value.push_back(fw.length());
