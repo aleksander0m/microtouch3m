@@ -79,10 +79,10 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     }
 #endif
 
-    m_strays_text_rect.x = screen_surface()->w / 2 + 20;
-    m_strays_text_rect.y = screen_surface()->h - 40;
-    m_strays_text_rect.w = (Uint16) (screen_surface()->w - m_strays_text_rect.x - 20);
-    m_strays_text_rect.h = (Uint16) (screen_surface()->h - m_strays_text_rect.y - 20);
+    m_strays_text_rect.x = screen_surface()->w - 175;
+    m_strays_text_rect.y = 80;
+    m_strays_text_rect.w = 160;
+    m_strays_text_rect.h = 70;
 
     set_scale(10000000);
 
@@ -277,7 +277,12 @@ void M3MScopeApp::draw()
             if (m_strays != m_prev_strays)
             {
                 std::ostringstream oss;
-                oss << m_strays.ul << " " << m_strays.ur << " " << m_strays.ll << " " << m_strays.lr;
+
+                oss << "UL: " << m_strays.ul << std::endl
+                    << "UR: " << m_strays.ur << std::endl
+                    << "LL: " << m_strays.ll << std::endl
+                    << "LR: " << m_strays.lr;
+
                 m_strays_text_string = oss.str();
 
                 SDL_FillRect(screen_surface(), &m_strays_text_rect, m_clear_color);
