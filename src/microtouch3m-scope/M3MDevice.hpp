@@ -102,6 +102,7 @@ private:
     timespec m_strays_update_time;
     Mutex m_mut_strays;
     signal_t m_strays;
+    microtouch3m_status_t m_callback_status;
 };
 
 #endif // MICROTOUCH3M_SCOPE_M3MDEVICE_HPP

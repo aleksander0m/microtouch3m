@@ -9,6 +9,7 @@
 
 Thread::Thread(const std::string &name) :
     m_exit(false),
+    m_done(false),
     m_started(false),
     m_joined(false),
     m_name(name)
@@ -69,6 +70,12 @@ void Thread::exit()
     set_exit(true);
 }
 
+bool Thread::done()
+{
+    MutexLock lock(&m_mut_done);
+    return m_done;
+}
+
 void Thread::set_exit(bool exit)
 {
     MutexLock lock(&m_mut_exit);
@@ -81,12 +88,20 @@ bool Thread::get_exit()
     return m_exit;
 }
 
+void Thread::set_done(bool done)
+{
+    MutexLock lock(&m_mut_done);
+    m_done = done;
+}
+
 void *Thread::thread_run(void *arg)
 {
     Thread *thr = static_cast<Thread*>(arg);
 
     while (!thr->get_exit() && thr->run())
     { }
+
+    thr->set_done(true);
 
     return 0;
 }

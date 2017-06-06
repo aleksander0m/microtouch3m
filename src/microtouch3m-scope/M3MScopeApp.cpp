@@ -155,6 +155,12 @@ void M3MScopeApp::update(uint32_t delta_time)
         }
     }
 
+    if (m_m3m_dev_mon_thread.done())
+    {
+        m_exit = true;
+        return;
+    }
+
     // update charts
 
     m_upd_start = m_upd_end;
