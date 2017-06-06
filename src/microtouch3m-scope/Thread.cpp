@@ -3,7 +3,15 @@
 #include <cstring>
 #include <stdexcept>
 
-Thread::Thread() : m_exit(false), m_started(false), m_joined(false)
+#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 12)
+    #define THREAD_NAMING
+#endif
+
+Thread::Thread(const std::string &name) :
+    m_exit(false),
+    m_started(false),
+    m_joined(false),
+    m_name(name)
 {
     memset(&m_attr, -1, sizeof(m_attr));
 }
@@ -23,6 +31,16 @@ void Thread::start()
     {
         throw std::runtime_error("Couldn't create thread: " + std::string(strerror(error)));
     }
+
+#ifdef THREAD_NAMING
+    if (!m_name.empty())
+    {
+        if ((error = pthread_setname_np(m_thr, m_name.substr(0, 15).c_str())))
+        {
+            throw std::runtime_error("Couldn't set name of thread: " + std::string(strerror(error)));
+        }
+    }
+#endif
 
     m_started = true;
 }

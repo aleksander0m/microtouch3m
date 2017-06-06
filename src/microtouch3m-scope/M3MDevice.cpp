@@ -155,7 +155,7 @@ void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *
 }
 
 M3MDeviceMonitorThread::M3MDeviceMonitorThread() :
-    Thread(),
+    Thread("m3m-dev-mon"),
     m_signals_r(&m_signals0),
     m_signals_w(&m_signals1)
 { }

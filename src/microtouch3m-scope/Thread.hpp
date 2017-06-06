@@ -1,6 +1,8 @@
 #ifndef MICROTOUCH3M_SCOPE_THREAD_HPP
 #define MICROTOUCH3M_SCOPE_THREAD_HPP
 
+#include <string>
+
 #include <pthread.h>
 
 #include "Mutex.hpp"
@@ -8,7 +10,7 @@
 class Thread
 {
 public:
-    Thread();
+    explicit Thread(const std::string &name = "");
     virtual ~Thread();
 
     void start();
@@ -27,6 +29,7 @@ private:
     bool m_exit;
     Mutex m_mut_exit;
     bool m_started, m_joined;
+    std::string m_name;
 
     static void *thread_run(void *arg);
 };
