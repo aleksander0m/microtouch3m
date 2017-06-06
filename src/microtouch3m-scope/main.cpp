@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     bool verbose = false;
     int print_fps = 0;
     int m3m_log = 0;
-    uint32_t scale = 10000000;
+    uint32_t scale = 8000000;
     uint16_t bits_per_pixel = 16;
     uint32_t samples = 100;
     uint32_t fps_limit = 1000;
