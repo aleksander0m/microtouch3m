@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cmath>
 
+#include <unistd.h>
+
 #include "Utils.hpp"
 
 #define PROCESS_IQ(i,q) (uint64_t) sqrt ((((double)i) * ((double)i)) + (((double)q) * ((double)q)))
@@ -199,6 +201,37 @@ bool M3MDeviceMonitorThread::run()
     {
         clock_gettime(CLOCK_REALTIME, &m_strays_update_time);
 
+#ifdef TEST_VALUES
+        while (!get_exit())
+        {
+            static uint64_t count = 0;
+
+            const int scale = 30000;
+
+            double test_time = count * 20.0;
+
+            int val0 = (int) (scale * (sin(test_time * 0.01) * 100 - 190));
+            int val1 = (int) (scale * (cos(test_time * 0.05) * 50 + 50));
+            int val2 = (int) (scale * ((sin(test_time * 0.01) + cos(test_time * 0.02)) * 100 + 50));
+            int val3 = (int) (scale * (count % 30 - 100));
+
+            push_signal(signal_t(val0, val1, val2, val3));
+
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            const timespec time_diff = Utils::timespec_diff(m_strays_update_time, now);
+
+            if (time_diff.tv_sec * 1000000000 + time_diff.tv_nsec >= 500000000)
+            {
+                m_strays_update_time = now;
+                set_strays(signal_t(val0, val1, val2, val3));
+            }
+
+            ++count;
+
+            usleep(1000000 / 70);
+        }
+#else
         m_m3m_dev = new M3MDevice();
 
         m_m3m_dev->open();
@@ -208,6 +241,7 @@ bool M3MDeviceMonitorThread::run()
 
         delete m_m3m_dev;
         m_m3m_dev = 0;
+#endif
     }
     catch (std::runtime_error &e)
     {

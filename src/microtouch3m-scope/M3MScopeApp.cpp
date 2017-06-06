@@ -128,9 +128,7 @@ void M3MScopeApp::set_scale(uint32_t scale)
 
 void M3MScopeApp::on_start()
 {
-#ifndef TEST_VALUES
     m_m3m_dev_mon_thread.start();
-#endif
 }
 
 void M3MScopeApp::update(uint32_t delta_time)
@@ -158,20 +156,12 @@ void M3MScopeApp::update(uint32_t delta_time)
 
     m_upd_start = m_upd_end;
 
-#ifndef TEST_VALUES
     std::queue<M3MDeviceMonitorThread::signal_t> * const signals = m_m3m_dev_mon_thread.get_signals_r();
 
     while (!signals->empty())
-#endif
     {
         const double scale = (double) (screen_surface()->h / 2 - 10) / m_scale_target;
 
-#ifdef TEST_VALUES
-        int val0 = (int) (sin(SDL_GetTicks() * 0.01) * 100 - 190);
-        int val1 = (int) (cos(SDL_GetTicks() * 0.05) * 50 + 50);
-        int val2 = (int) ((sin(SDL_GetTicks() * 0.01) + cos(SDL_GetTicks() * 0.02)) * 100 + 50);
-        int val3 = (int) (m_current_pos % 30 - 100);
-#else
         M3MDeviceMonitorThread::signal_t sig = signals->front();
         signals->pop();
 
@@ -181,7 +171,6 @@ void M3MScopeApp::update(uint32_t delta_time)
         int val3 = (int) (sig.lr * scale);
 
         m_strays = m_m3m_dev_mon_thread.get_strays();
-#endif
 
         switch (m_chart_mode)
         {

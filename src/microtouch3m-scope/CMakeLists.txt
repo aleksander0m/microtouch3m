@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-option(IMX51 "Make IMX51 build" false)
+# must be before project(), or won't work
+option(IMX51 "Make IMX51 build" off)
 
 if (IMX51)
     set(CMAKE_PROGRAM_PATH ${CMAKE_PROGRAM_PATH} /opt/timesys/i_MX51/toolchain/bin)
@@ -9,6 +10,12 @@ if (IMX51)
 endif()
 
 project(microtouch3m-scope)
+
+option(TEST_VALUES "Use test values instead of real microtouch3m device" off)
+
+if (TEST_VALUES)
+    add_definitions(-DTEST_VALUES)
+endif()
 
 if (IMX51)
     add_definitions(-DIMX51)
