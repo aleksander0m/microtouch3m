@@ -46,6 +46,7 @@ private:
     M3MLogger m_m3m_logger;
     M3MDeviceMonitorThread m_m3m_dev_mon_thread;
     std::string m_static_text_string;
+    std::string m_static_version_text_string;
     std::string m_scale_target_string;
     bool m_print_fps;
     uint32_t m_upd_start;

@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "M3MScopeApp.hpp"
 
 #include <sstream>
@@ -25,7 +27,8 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_upd_end(0),
     m_chart_prog(0.0f),
     m_old_chart_prog(0.0f),
-    m_clear_color(Color(0, 0, 0).map_rgb(screen_surface()->format))
+    m_clear_color(Color(0, 0, 0).map_rgb(screen_surface()->format)),
+    m_static_version_text_string("SW Version: " + std::string(PACKAGE_VERSION))
 {
     m_m3m_logger.enable(m3m_log);
 
@@ -356,6 +359,9 @@ void M3MScopeApp::draw()
     draw_text(screen_surface()->w - text_margin, text_margin, m_static_text_string, true);
 
     draw_text(m_strays_text_rect.x, m_strays_text_rect.y, m_strays_text_string);
+
+    draw_text(screen_surface()->w - text_margin, screen_surface()->h - text_margin,
+              m_static_version_text_string, true, true);
 }
 
 void M3MScopeApp::on_event(const SDL_Event &event)
