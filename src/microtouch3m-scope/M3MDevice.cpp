@@ -158,7 +158,7 @@ M3MDeviceMonitorThread::M3MDeviceMonitorThread() :
     Thread("m3m-dev-mon"),
     m_signals_r(&m_signals0),
     m_signals_w(&m_signals1),
-    m_callback_status(MICROTOUCH3M_STATUS_OK)
+    m_callback_failures(0)
 { }
 
 M3MDeviceMonitorThread::~M3MDeviceMonitorThread()
@@ -249,11 +249,6 @@ bool M3MDeviceMonitorThread::run()
         std::cerr << e.what() << std::endl;
     }
 
-    if (m_callback_status != MICROTOUCH3M_STATUS_OK)
-    {
-        std::cerr << "M3M: callback failed with status - " << microtouch3m_status_to_string(m_callback_status) << std::endl;
-    }
-
     return false;
 }
 
@@ -263,14 +258,24 @@ bool M3MDeviceMonitorThread::monitor_async_reports_callback(microtouch3m_device_
 {
     M3MDeviceMonitorThread * const thread = static_cast<M3MDeviceMonitorThread * const>(user_data);
 
+    if (!thread) return false;
+
     if (status != MICROTOUCH3M_STATUS_OK)
     {
-        thread->m_callback_status = status;
+        ++thread->m_callback_failures;
 
-        return false;
+        std::cerr << "M3M: callback failed with status - " << microtouch3m_status_to_string(status)
+                  << " (" << thread->m_callback_failures << ")" << std::endl;
+
+        if (thread->m_callback_failures >= 10)
+        {
+            std::cerr << "M3M: Stopping monitoring." << std::endl;
+
+            return false;
+        }
+
+        return true;
     }
-
-    if (!thread) return false;
 
     const uint64_t ul_signal = PROCESS_IQ(ul_i, ul_q);
     const uint64_t ur_signal = PROCESS_IQ(ur_i, ur_q);
