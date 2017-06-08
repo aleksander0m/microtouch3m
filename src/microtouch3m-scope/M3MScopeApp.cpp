@@ -14,6 +14,8 @@
 
 #include "Utils.hpp"
 
+uint32_t M3MScopeApp::s_text_margin = 20;
+
 M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
                          uint32_t fps_limit, bool verbose, bool vsync, bool m3m_log, uint32_t samples,
                          ChartMode chart_mode) :
@@ -276,12 +278,17 @@ void M3MScopeApp::draw()
             {
                 std::ostringstream oss;
 
-                oss << "UL: " << m_strays.ul << std::endl
-                    << "UR: " << m_strays.ur << std::endl
-                    << "LL: " << m_strays.ll << std::endl
-                    << "LR: " << m_strays.lr;
+                oss << "STRAYS " << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << m_strays.ul << std::endl
+                                 << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << m_strays.ur << std::endl
+                                 << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
+                                 << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << m_strays.lr;
 
                 m_strays_text_string = oss.str();
+
+                const uint32_t text_width = m_bmp_font_renderer.text_width(m_strays_text_string);
+
+                m_strays_text_rect.w = (Uint16) text_width;
+                m_strays_text_rect.x = screen_surface()->w - s_text_margin - m_strays_text_rect.w;
 
                 SDL_FillRect(screen_surface(), &m_strays_text_rect, m_clear_color);
 
@@ -320,7 +327,7 @@ void M3MScopeApp::draw()
 
     // draw text
 
-    const int text_margin = 20;
+    const int text_margin = s_text_margin;
 
     switch (m_chart_mode)
     {
@@ -364,7 +371,7 @@ void M3MScopeApp::draw()
 
     draw_text(screen_surface()->w - text_margin, text_margin, m_static_text_string, true);
 
-    draw_text(m_strays_text_rect.x, m_strays_text_rect.y, m_strays_text_string);
+    draw_text(m_strays_text_rect.x + m_strays_text_rect.w, m_strays_text_rect.y, m_strays_text_string, true);
 
     draw_text(screen_surface()->w - text_margin, screen_surface()->h - text_margin,
               m_static_version_text_string, true, true);

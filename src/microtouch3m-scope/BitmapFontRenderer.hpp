@@ -14,6 +14,8 @@ public:
     void draw(SDL_Surface *surface, int32_t x, int32_t y, const std::string &text,
               bool align_right = false, bool align_bottom = false);
 
+    uint32_t text_width(const std::string &text) const;
+
 private:
 
     void map_rect_for_letter(SDL_Rect *rect, char letter);

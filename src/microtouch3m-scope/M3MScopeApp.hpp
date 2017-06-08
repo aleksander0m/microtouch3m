@@ -36,6 +36,8 @@ private:
     void create_charts();
     void draw_text(int32_t x, int32_t y, const std::string &text, bool align_right = false, bool align_bottom = false);
 
+    static uint32_t s_text_margin;
+
     uint32_t m_sample_count;
     uint64_t m_current_pos;
     std::vector<LineChart<int> > m_charts;

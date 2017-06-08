@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <sstream>
 #include "BitmapFontRenderer.hpp"
 
 /* Ignore ISO C++ warnings when including font xpm files */
@@ -89,6 +90,20 @@ void BitmapFontRenderer::draw(SDL_Surface *surface, int32_t x, int32_t y, const 
         dst.x = origin_x;
         dst.y += s_font_h;
     }
+}
+
+uint32_t BitmapFontRenderer::text_width(const std::string &text) const
+{
+    std::istringstream iss(text);
+    std::string line;
+    size_t ret = 0;
+
+    while (std::getline(iss, line))
+    {
+        ret = std::max(ret, line.length());
+    }
+
+    return (uint32_t) (ret * s_font_w);
 }
 
 void BitmapFontRenderer::map_rect_for_letter(SDL_Rect *rect, char letter)
