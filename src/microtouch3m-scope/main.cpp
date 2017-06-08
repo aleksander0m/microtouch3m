@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <sstream>
+#include <csignal>
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "UnusedImportStatement"
@@ -20,6 +21,7 @@
 
 static void print_help();
 static void print_version();
+static void sig_handler(int sig);
 
 enum Options
 {
@@ -31,6 +33,8 @@ uint32_t opt_samples = 4000;
 uint32_t opt_scale = 8000000;
 uint16_t opt_bits_per_pixel = 16;
 uint32_t opt_fps_limit = 1000;
+
+SDLApp *s_sdl_app;
 
 int main(int argc, char *argv[])
 {
@@ -185,7 +189,19 @@ int main(int argc, char *argv[])
         sdlApp.set_print_fps((bool) print_fps);
         sdlApp.set_scale(opt_scale);
 
-        return sdlApp.exec();
+        s_sdl_app = &sdlApp;
+
+        if (signal(SIGUSR1, sig_handler) == SIG_ERR)
+        {
+            std::cerr << "Can't setup SIGUSR1 handler." << std::endl;
+            return 1;
+        }
+
+        int ret = sdlApp.exec();
+
+        s_sdl_app = 0;
+
+        return ret;
     }
     catch (const std::runtime_error &e)
     {
@@ -210,7 +226,11 @@ void print_help()
               << "      --fps-limit      FPS limit. Default: " << opt_fps_limit << std::endl
               << "      --four-charts    Draw four charts." << std::endl
               << "      --no-vsync       Disable VSYNC." << std::endl
-              << std::endl;
+              << std::endl
+              << "  Send USR1 signal to it to make a screenshot. E.g.:" << std::endl
+              << std::endl
+              << "    $ pkill -USR1 -n -x \"microtouch3m-sc.*\""
+              << std::endl << std::endl;
 }
 
 void print_version()
@@ -219,4 +239,18 @@ void print_version()
               << PROGRAM_NAME << " " << PROGRAM_VERSION << std::endl
               << "Copyright (2017) Zodiac Inflight Innovations" << std::endl
               << std::endl;
+}
+
+void sig_handler(int sig)
+{
+    if (sig == SIGUSR1 && s_sdl_app)
+    {
+        const std::string &file_path = "./pic.ppm";
+
+        std::cout << "Writing screenshot to \"" << file_path << "\" ..." << std::endl;
+
+        s_sdl_app->screenshot(file_path);
+
+        std::cout << "Done." << std::endl;
+    }
 }

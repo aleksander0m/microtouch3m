@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
+#include "SDLUtils.hpp"
+
 #ifndef FBIO_WAITFORVSYNC
 #define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
 #endif
@@ -178,6 +180,11 @@ void SDLApp::enable_cursor(bool enable)
 uint32_t SDLApp::fps() const
 {
     return m_fps;
+}
+
+void SDLApp::screenshot(const std::string &file_path)
+{
+    sdl_utils::save_buffer(m_screen_surface, file_path);
 }
 
 SDL_Surface *SDLApp::screen_surface() const

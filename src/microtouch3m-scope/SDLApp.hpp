@@ -1,6 +1,8 @@
 #ifndef MICROTOUCH_3M_SCOPE_SDLAPP_HPP
 #define MICROTOUCH_3M_SCOPE_SDLAPP_HPP
 
+#include <string>
+
 #include "SDL.h"
 
 class SDLApp
@@ -13,6 +15,7 @@ public:
     int exec();
     void enable_cursor(bool enable);
     uint32_t fps() const;
+    void screenshot(const std::string &file_path);
 
 protected:
     SDL_Surface *screen_surface() const;

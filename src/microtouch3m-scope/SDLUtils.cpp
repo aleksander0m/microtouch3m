@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <fstream>
 
 #include "SDL_endian.h"
 
@@ -130,5 +131,33 @@ void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_
             y += ystep;
             error += dx;
         }
+    }
+}
+
+void ::sdl_utils::save_buffer(SDL_Surface *surface, const std::string &file_name)
+{
+    std::ofstream ofs(file_name.c_str());
+
+    ofs << "P3" << std::endl
+        << surface->w << " " << surface->h << std::endl
+        << "255" << std::endl;
+
+    const int bpp = surface->format->BytesPerPixel;
+
+    for (int y = 0; y < surface->h; ++y)
+    {
+        for (int x = 0; x < surface->w; ++x)
+        {
+            Uint8 *p = (Uint8 *) surface->pixels + y * surface->pitch + x * bpp;
+            const Uint32 color = *(Uint32 *) p;
+
+            const int r = ((color & surface->format->Rmask) >> surface->format->Rshift) << surface->format->Rloss;
+            const int g = ((color & surface->format->Gmask) >> surface->format->Gshift) << surface->format->Gloss;
+            const int b = ((color & surface->format->Bmask) >> surface->format->Bshift) << surface->format->Bloss;
+
+            ofs << r << " " << g << " " << b << " ";
+        }
+
+        ofs << std::endl;
     }
 }
