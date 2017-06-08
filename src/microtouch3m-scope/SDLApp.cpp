@@ -21,7 +21,8 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t
     m_fps_limit(fps_limit),
     m_fps(0),
     m_fbdev(-1),
-    m_vsync(vsync)
+    m_vsync(vsync),
+    m_make_screenshot(false)
 {
     if (verbose)
     {
@@ -155,6 +156,15 @@ int SDLApp::exec()
 
         SDL_Flip(screen_surface());
 
+        // screenshot
+
+        if (m_make_screenshot)
+        {
+            sdl_utils::save_buffer(m_screen_surface, m_screenshot_path);
+
+            m_make_screenshot = false;
+        }
+
         // sleep until next frame to keep CPU load sane
 
         int32_t frame_time_remaining = (int32_t) round(1000.0 / m_fps_limit - (SDL_GetTicks() - iteration_start));
@@ -184,7 +194,8 @@ uint32_t SDLApp::fps() const
 
 void SDLApp::screenshot(const std::string &file_path)
 {
-    sdl_utils::save_buffer(m_screen_surface, file_path);
+    m_make_screenshot = true;
+    m_screenshot_path = file_path;
 }
 
 SDL_Surface *SDLApp::screen_surface() const

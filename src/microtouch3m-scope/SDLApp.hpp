@@ -36,6 +36,8 @@ private:
     uint32_t m_fps;
     int m_fbdev;
     bool m_vsync;
+    bool m_make_screenshot;
+    std::string m_screenshot_path;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_SDLAPP_HPP
