@@ -15,6 +15,7 @@ public:
               bool align_right = false, bool align_bottom = false);
 
     uint32_t text_width(const std::string &text) const;
+    uint32_t text_height(const std::string &text) const;
 
 private:
 

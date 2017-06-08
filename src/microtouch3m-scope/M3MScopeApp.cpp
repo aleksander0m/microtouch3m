@@ -278,15 +278,34 @@ void M3MScopeApp::draw()
             {
                 std::ostringstream oss;
 
-                oss << "STRAYS " << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << m_strays.ul << std::endl
-                                 << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << m_strays.ur << std::endl
-                                 << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
-                                 << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << m_strays.lr;
+                oss << "STRAYS "
+                    << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << m_strays.ul << std::endl
+                    << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << m_strays.ur << std::endl
+                    << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
+                    << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << m_strays.lr;
+
+                const int64_t delta_strays_ul = m_strays.ul - m_prev_strays.ul;
+                const int64_t delta_strays_ur = m_strays.ur - m_prev_strays.ur;
+                const int64_t delta_strays_ll = m_strays.ll - m_prev_strays.ll;
+                const int64_t delta_strays_lr = m_strays.lr - m_prev_strays.lr;
+                const int64_t delta_strays_sum = delta_strays_ul + delta_strays_ur + delta_strays_ll + delta_strays_lr;
+
+                oss << std::endl << std::endl
+                    << "DELTA "
+                    << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << delta_strays_ul << std::endl
+                    << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << delta_strays_ur << std::endl
+                    << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << delta_strays_ll << std::endl
+                    << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << delta_strays_lr;
+
+                oss << std::endl << std::endl
+                    << std::setw(11) << std::left << "DELTA SUM: "
+                    << std::setw(11) << std::right << delta_strays_sum << std::endl;
 
                 m_strays_text_string = oss.str();
 
                 const uint32_t text_width = m_bmp_font_renderer.text_width(m_strays_text_string);
 
+                m_strays_text_rect.h = (Uint16) m_bmp_font_renderer.text_height(m_strays_text_string);
                 m_strays_text_rect.w = (Uint16) text_width;
                 m_strays_text_rect.x = screen_surface()->w - s_text_margin - m_strays_text_rect.w;
 

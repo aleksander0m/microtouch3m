@@ -106,6 +106,13 @@ uint32_t BitmapFontRenderer::text_width(const std::string &text) const
     return (uint32_t) (ret * s_font_w);
 }
 
+uint32_t BitmapFontRenderer::text_height(const std::string &text) const
+{
+    if (text.empty()) return 0;
+
+    return (uint32_t) ((std::count(text.begin(), text.end(), '\n') + (text[text.length() - 1] != '\n')) * s_font_h);
+}
+
 void BitmapFontRenderer::map_rect_for_letter(SDL_Rect *rect, char letter)
 {
     if (!rect) return;
