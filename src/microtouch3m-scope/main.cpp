@@ -247,10 +247,6 @@ void sig_handler(int sig)
     {
         const std::string &file_path = "./pic.ppm";
 
-        std::cout << "Writing screenshot to \"" << file_path << "\" ..." << std::endl;
-
         s_sdl_app->screenshot(file_path);
-
-        std::cout << "Done." << std::endl;
     }
 }

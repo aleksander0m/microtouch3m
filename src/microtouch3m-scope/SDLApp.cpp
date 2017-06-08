@@ -160,7 +160,9 @@ int SDLApp::exec()
 
         if (m_make_screenshot)
         {
+            std::cout << std::endl << "Writing screenshot to \"" << m_screenshot_path << "\" ..." << std::endl;
             sdl_utils::save_buffer(m_screen_surface, m_screenshot_path);
+            std::cout << "Done." << std::endl;
 
             m_make_screenshot = false;
         }
