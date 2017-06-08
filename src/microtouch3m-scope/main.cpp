@@ -27,15 +27,16 @@ enum Options
     OPT_FPS_LIMIT
 };
 
+uint32_t opt_samples = 4000;
+uint32_t opt_scale = 8000000;
+uint16_t opt_bits_per_pixel = 16;
+uint32_t opt_fps_limit = 1000;
+
 int main(int argc, char *argv[])
 {
     bool verbose = false;
     int print_fps = 0;
     int m3m_log = 0;
-    uint32_t scale = 8000000;
-    uint16_t bits_per_pixel = 16;
-    uint32_t samples = 4000;
-    uint32_t fps_limit = 1000;
     int four_charts = 0;
     int no_vsync = 0;
 
@@ -83,7 +84,7 @@ int main(int argc, char *argv[])
             {
                 bool err = false;
                 uint32_t k = 0;
-                scale = 0;
+                opt_scale = 0;
 
                 const std::string arg(optarg);
 
@@ -91,7 +92,7 @@ int main(int argc, char *argv[])
                 {
                     if (*cit >= '0' && *cit <= '9')
                     {
-                        scale = scale * 10 + (*cit - '0');
+                        opt_scale = opt_scale * 10 + (*cit - '0');
                         ++k;
                     }
                     else
@@ -99,11 +100,11 @@ int main(int argc, char *argv[])
                         switch (*cit)
                         {
                             case 'K':
-                                scale *= 1000;
+                                opt_scale *= 1000;
                                 k += 3;
                                 break;
                             case 'M':
-                                scale *= 1000000;
+                                opt_scale *= 1000000;
                                 k += 6;
                                 break;
                             default:
@@ -119,7 +120,7 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                if (err || scale < 10000)
+                if (err || opt_scale < 10000)
                 {
                     std::cerr << "Invalid scale argument: " << arg << std::endl;
                     return 1;
@@ -128,9 +129,9 @@ int main(int argc, char *argv[])
                 break;
 
             case 'b':
-                std::istringstream(optarg) >> bits_per_pixel;
+                std::istringstream(optarg) >> opt_bits_per_pixel;
 
-                if (bits_per_pixel != 0 && (bits_per_pixel < 8 || bits_per_pixel > 32))
+                if (opt_bits_per_pixel != 0 && (opt_bits_per_pixel < 8 || opt_bits_per_pixel > 32))
                 {
                     std::cerr << "Invalid bpp argument: " << optarg << std::endl;
                     return 1;
@@ -138,9 +139,9 @@ int main(int argc, char *argv[])
                 break;
 
             case 'k':
-                std::istringstream(optarg) >> samples;
+                std::istringstream(optarg) >> opt_samples;
 
-                if (samples < 2 || samples > 10000)
+                if (opt_samples < 2 || opt_samples > 10000)
                 {
                     std::cerr << "Invalid samples argument: " << optarg << std::endl;
                     return 1;
@@ -148,9 +149,9 @@ int main(int argc, char *argv[])
                 break;
 
             case OPT_FPS_LIMIT:
-                std::istringstream(optarg) >> fps_limit;
+                std::istringstream(optarg) >> opt_fps_limit;
 
-                if (fps_limit < 1 || fps_limit > 1000)
+                if (opt_fps_limit < 1 || opt_fps_limit > 1000)
                 {
                     std::cerr << "Invalid fps-limit argument: " << optarg << std::endl;
                     return 1;
@@ -173,8 +174,8 @@ int main(int argc, char *argv[])
 #endif
         ;
 
-        M3MScopeApp sdlApp(width, height, (uint8_t) bits_per_pixel, flags, fps_limit, verbose, !no_vsync,
-                           (bool) m3m_log, samples,
+        M3MScopeApp sdlApp(width, height, (uint8_t) opt_bits_per_pixel, flags, opt_fps_limit, verbose, !no_vsync,
+                           (bool) m3m_log, opt_samples,
                            four_charts ? M3MScopeApp::CHART_MODE_FOUR : M3MScopeApp::CHART_MODE_ONE);
 
 #if defined(IMX51)
@@ -182,7 +183,7 @@ int main(int argc, char *argv[])
 #endif
 
         sdlApp.set_print_fps((bool) print_fps);
-        sdlApp.set_scale(scale);
+        sdlApp.set_scale(opt_scale);
 
         return sdlApp.exec();
     }
@@ -202,11 +203,11 @@ void print_help()
               << "      --version        Show version." << std::endl
               << "      --print-fps      Print FPS each second." << std::endl
               << "      --m3m-log        Enable microtouch3m log." << std::endl
-              << "  -s, --scale          Min/max value of chart in [10K; 999999999] range." << std::endl
+              << "  -s, --scale          Min/max value of chart in [10K; 999999999] range. Default: " << opt_scale << std::endl
               << "                       Examples of acceptable values: 100, 5K, 6M, etc." << std::endl
-              << "      --bpp            Bits per pixel. Default: 16." << std::endl
-              << "  -k, --samples        Number of samples in charts. Values in range [2; 10000] are accepted." << std::endl
-              << "      --fps-limit      FPS limit." << std::endl
+              << "      --bpp            Bits per pixel. Default: " << opt_bits_per_pixel << std::endl
+              << "  -k, --samples        Number of samples in charts. Values in range [2; 10000] are accepted. Default: " << opt_samples << std::endl
+              << "      --fps-limit      FPS limit. Default: " << opt_fps_limit << std::endl
               << "      --four-charts    Draw four charts." << std::endl
               << "      --no-vsync       Disable VSYNC." << std::endl
               << std::endl;
