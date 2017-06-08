@@ -58,6 +58,7 @@ private:
     Uint32 m_clear_color;
     M3MDeviceMonitorThread::signal_t m_strays;
     M3MDeviceMonitorThread::signal_t m_prev_strays;
+    M3MDeviceMonitorThread::signal_t m_signal;
     SDL_Rect m_strays_text_rect;
     std::string m_strays_text_string;
 };

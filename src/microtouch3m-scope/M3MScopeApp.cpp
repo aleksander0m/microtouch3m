@@ -173,15 +173,13 @@ void M3MScopeApp::update(uint32_t delta_time)
     {
         const double scale = (double) (screen_surface()->h / 2 - 10) / m_scale_target;
 
-        M3MDeviceMonitorThread::signal_t sig = signals->front();
+        m_signal = signals->front();
         signals->pop();
 
-        int val0 = (int) (sig.ul * scale);
-        int val1 = (int) (sig.ur * scale);
-        int val2 = (int) (sig.ll * scale);
-        int val3 = (int) (sig.lr * scale);
-
-        m_strays = m_m3m_dev_mon_thread.get_strays();
+        int val0 = (int) (m_signal.ul * scale);
+        int val1 = (int) (m_signal.ur * scale);
+        int val2 = (int) (m_signal.ll * scale);
+        int val3 = (int) (m_signal.lr * scale);
 
         switch (m_chart_mode)
         {
@@ -220,6 +218,8 @@ void M3MScopeApp::update(uint32_t delta_time)
     }
 
     m_upd_end = (uint32_t) ((m_current_pos - 1) % m_sample_count);
+
+    m_strays = m_m3m_dev_mon_thread.get_strays();
 
     m_old_chart_prog = m_chart_prog;
     m_chart_prog = (float) (m_current_pos % m_sample_count) / m_sample_count;
@@ -274,7 +274,7 @@ void M3MScopeApp::draw()
             SDL_FillRect(screen_surface(), &bounds, m_clear_color);
 
             // clear strays text area
-            if (m_strays != m_prev_strays)
+//            if (m_strays != m_prev_strays)
             {
                 std::ostringstream oss;
 
@@ -283,10 +283,10 @@ void M3MScopeApp::draw()
                     << std::left << "STRAYS LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
                     << std::left << "STRAYS LR: " << std::setw(11) << std::right << m_strays.lr;
 
-                const int64_t delta_strays_ul = m_strays.ul - m_prev_strays.ul;
-                const int64_t delta_strays_ur = m_strays.ur - m_prev_strays.ur;
-                const int64_t delta_strays_ll = m_strays.ll - m_prev_strays.ll;
-                const int64_t delta_strays_lr = m_strays.lr - m_prev_strays.lr;
+                const int64_t delta_strays_ul = m_signal.ul;
+                const int64_t delta_strays_ur = m_signal.ur;
+                const int64_t delta_strays_ll = m_signal.ll;
+                const int64_t delta_strays_lr = m_signal.lr;
                 const int64_t delta_strays_sum = delta_strays_ul + delta_strays_ur + delta_strays_ll + delta_strays_lr;
 
                 oss << std::endl << std::endl
