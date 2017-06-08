@@ -82,7 +82,7 @@ public:
 
         m_middle_y = m_top + m_height / 2;
 
-        m_grid_cell_w = m_width / Utils::closest_factor(m_width, 10);
+        m_grid_cell_w = m_width / Utils::closest_factor(m_width, 14);
         m_grid_cell_h = m_height / Utils::closest_factor(m_height, 10);
         m_grid_dash_step = Utils::gcd(m_grid_cell_w, m_grid_cell_h);
         m_grid_stub_h = m_grid_dash_step * 2;
