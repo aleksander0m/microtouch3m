@@ -6,6 +6,7 @@
 #include "SDL.h"
 
 #include "SDLUtils.hpp"
+#include "Utils.hpp"
 
 template<class T>
 class LineChart
@@ -78,6 +79,13 @@ public:
 
         m_right = m_left + m_width - 1;
         m_bottom = m_top + m_height - 1;
+
+        m_middle_y = m_top + m_height / 2;
+
+        m_grid_cell_w = m_width / Utils::closest_factor(m_width, 10);
+        m_grid_cell_h = m_height / Utils::closest_factor(m_height, 10);
+        m_grid_dash_step = Utils::gcd(m_grid_cell_w, m_grid_cell_h);
+        m_grid_stub_h = m_grid_dash_step * 2;
     }
 
     void draw(SDL_Surface *surface)
@@ -119,9 +127,34 @@ public:
             }
         }
 
-        // border
+        // grid
 
         const Uint32 col_border(Color(0xff, 0xff, 0x0).map_rgb(surface->format));
+
+        // horizontal lines
+        for (int y = m_top + m_grid_cell_h; y < m_bottom; y += m_grid_cell_h)
+        {
+            for (int x = m_left; x < m_right; x += m_grid_dash_step)
+            {
+                sdl_utils::set_pixel_no_clip(surface, (uint32_t) x, (uint32_t) y, col_border);
+            }
+        }
+
+        // vertical lines
+        for (int x = m_left + m_grid_cell_w; x < m_right; x += m_grid_cell_w)
+        {
+            for (int y = m_top; y < m_bottom; y += m_grid_dash_step)
+            {
+                sdl_utils::set_pixel_no_clip(surface, (uint32_t) x, (uint32_t) y, col_border);
+            }
+
+            // stubs
+            sdl_utils::draw_line(surface, x, m_top, x, m_top + m_grid_stub_h, col_border);
+            sdl_utils::draw_line(surface, x, m_bottom, x, m_bottom - m_grid_stub_h, col_border);
+            sdl_utils::draw_line(surface, x, m_middle_y - m_grid_stub_h, x, m_middle_y + m_grid_stub_h, col_border);
+        }
+
+        // border
 
         sdl_utils::draw_line(surface,
                             m_left, m_top,
@@ -149,18 +182,8 @@ public:
 
         sdl_utils::draw_line(surface,
                             m_left, m_top + m_height / 2,
-                            m_left + m_width, m_top + m_height / 2,
+                            m_right, m_top + m_height / 2,
                             col_axis_x);
-
-        for (int i = 1; i < 10; ++i)
-        {
-            const int x = m_left + i * m_width / 10;
-
-            sdl_utils::draw_line(surface,
-                                x, m_top + m_height / 2 - 5,
-                                x, m_top + m_height / 2 + 5,
-                                col_axis_x);
-        }
 
         // vertical
 
@@ -198,6 +221,11 @@ protected:
     int32_t m_right, m_bottom;
     float m_progress;
     std::vector<Curve> m_curves;
+    uint32_t m_grid_dash_step;
+    uint32_t m_grid_cell_w;
+    uint32_t m_grid_cell_h;
+    uint32_t m_middle_y;
+    uint32_t m_grid_stub_h;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_GRAPH_HPP

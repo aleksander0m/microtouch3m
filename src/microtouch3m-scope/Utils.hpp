@@ -4,6 +4,7 @@
 #include <string>
 
 #include <time.h>
+#include <stdint.h>
 
 namespace Utils {
     inline timespec timespec_diff(const timespec &start, const timespec &stop)
@@ -25,6 +26,8 @@ namespace Utils {
     }
 
     std::string ipv4_string();
+    int32_t closest_factor(int32_t of_number, int32_t to_number);
+    unsigned int gcd(unsigned int u, unsigned int v);
 };
 
 #endif // MICROTOUCH3M_SCOPE_UTILS_HPP

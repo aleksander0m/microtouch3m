@@ -1,6 +1,7 @@
 #include "SDLUtils.hpp"
 
 #include <iostream>
+#include <cassert>
 
 #include "SDL_endian.h"
 
@@ -12,9 +13,9 @@ void ::sdl_utils::set_clip_area(int x = 0, int y = 0, int width = 999999, int he
     m_clip_y1 = m_clip_y0 + height - 1;
 }
 
-void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32 color)
+void ::sdl_utils::set_pixel_no_clip(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32 color)
 {
-    if (x < m_clip_x0 || x > m_clip_x1 || y < m_clip_y0 || y > m_clip_y1) return;
+    assert(!(x < m_clip_x0 || x > m_clip_x1 || y < m_clip_y0 || y > m_clip_y1));
 
     const int bpp = surface->format->BytesPerPixel;
 
@@ -53,6 +54,13 @@ void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32
 
         default:break;
     }
+}
+
+void ::sdl_utils::set_pixel(SDL_Surface *surface, uint32_t x, uint32_t y, Uint32 color)
+{
+    if (x < m_clip_x0 || x > m_clip_x1 || y < m_clip_y0 || y > m_clip_y1) return;
+
+    ::sdl_utils::set_pixel_no_clip(surface, x, y, color);
 }
 
 void ::sdl_utils::draw_line(SDL_Surface *surface, int32_t x0, int32_t y0, int32_t x1, int32_t y1, Uint32 color)
