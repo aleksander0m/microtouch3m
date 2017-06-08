@@ -278,11 +278,10 @@ void M3MScopeApp::draw()
             {
                 std::ostringstream oss;
 
-                oss << "STRAYS "
-                    << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << m_strays.ul << std::endl
-                    << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << m_strays.ur << std::endl
-                    << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
-                    << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << m_strays.lr;
+                oss << std::left << "STRAYS UL: " << std::setw(11) << std::right << m_strays.ul << std::endl
+                    << std::left << "STRAYS UR: " << std::setw(11) << std::right << m_strays.ur << std::endl
+                    << std::left << "STRAYS LL: " << std::setw(11) << std::right << m_strays.ll << std::endl
+                    << std::left << "STRAYS LR: " << std::setw(11) << std::right << m_strays.lr;
 
                 const int64_t delta_strays_ul = m_strays.ul - m_prev_strays.ul;
                 const int64_t delta_strays_ur = m_strays.ur - m_prev_strays.ur;
@@ -291,15 +290,13 @@ void M3MScopeApp::draw()
                 const int64_t delta_strays_sum = delta_strays_ul + delta_strays_ur + delta_strays_ll + delta_strays_lr;
 
                 oss << std::endl << std::endl
-                    << "DELTA "
-                    << std::setw(4) << std::left << "UL: " << std::setw(11) << std::right << delta_strays_ul << std::endl
-                    << std::setw(4) << std::left << "UR: " << std::setw(11) << std::right << delta_strays_ur << std::endl
-                    << std::setw(4) << std::left << "LL: " << std::setw(11) << std::right << delta_strays_ll << std::endl
-                    << std::setw(4) << std::left << "LR: " << std::setw(11) << std::right << delta_strays_lr;
+                    << std::left << "DELTA UL: " << std::setw(11) << std::right << delta_strays_ul << std::endl
+                    << std::left << "DELTA UR: " << std::setw(11) << std::right << delta_strays_ur << std::endl
+                    << std::left << "DELTA LL: " << std::setw(11) << std::right << delta_strays_ll << std::endl
+                    << std::left << "DELTA LR: " << std::setw(11) << std::right << delta_strays_lr;
 
                 oss << std::endl << std::endl
-                    << std::setw(11) << std::left << "DELTA SUM: "
-                    << std::setw(11) << std::right << delta_strays_sum << std::endl;
+                    << std::left << "DELTA SUM: " << std::setw(11) << std::right << delta_strays_sum << std::endl;
 
                 m_strays_text_string = oss.str();
 
