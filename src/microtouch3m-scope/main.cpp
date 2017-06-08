@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     int m3m_log = 0;
     uint32_t scale = 8000000;
     uint16_t bits_per_pixel = 16;
-    uint32_t samples = 100;
+    uint32_t samples = 4000;
     uint32_t fps_limit = 1000;
     int four_charts = 0;
     int no_vsync = 0;
