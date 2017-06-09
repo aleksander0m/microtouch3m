@@ -688,6 +688,42 @@ out:
 }
 
 /******************************************************************************/
+/* ACTION: reset */
+
+static int
+run_reset (microtouch3m_context_t      *ctx,
+           bool                         first,
+           uint8_t                      bus_number,
+           uint8_t                      device_address,
+           microtouch3m_device_reset_t  type)
+{
+    microtouch3m_device_t *dev = NULL;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_reset (dev, type)) != MICROTOUCH3M_STATUS_OK) {
+        /* IO error in HARD reset is expected */
+        if ((type == MICROTOUCH3M_DEVICE_RESET_SOFT) || (st != MICROTOUCH3M_STATUS_INVALID_IO)) {
+            fprintf (stderr, "error: couldn't %s reset controller: %s\n",
+                     microtouch3m_device_reset_to_string (type),
+                     microtouch3m_status_to_string (st));
+            goto out;
+        }
+    }
+
+    printf ("successfully run %s reset\n", microtouch3m_device_reset_to_string (type));
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
 /* ACTION: frequency check */
 
 /* Ignore the first 5 records. At least the first one seems to have some
@@ -1630,7 +1666,11 @@ print_help (void)
             "  -I, --set-identifier=[HH:HH:HH:HH]     Set the 4 byte identifier.\n"
             "  -o, --set-orientation=[OR]             Set the orientation (See Notes).\n"
             "  -l, --set-sensitivity-level=[LVL]      Set sensitivity level (See Notes).\n"
-            "  -r, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
+            "  -p, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
+            "\n"
+            "Reset actions:\n"
+            "  -r, --reset-soft                       Perform a soft reset.\n"
+            "  -R, --reset-hard                       Perform a hard reset.\n"
             "\n"
             "Frequency check device actions:\n"
             "  -F, --frequency-check                  Run frequency check mode.\n"
@@ -1741,6 +1781,8 @@ int main (int argc, char **argv)
     char                   *set_orientation           = NULL;
     char                   *set_sensitivity_level     = NULL;
     char                   *set_frequency             = NULL;
+    bool                    reset_soft                = false;
+    bool                    reset_hard                = false;
     bool                    frequency_check           = false;
     char                   *linearization_data_load   = NULL;
     char                   *linearization_data_save   = NULL;
@@ -1764,7 +1806,9 @@ int main (int argc, char **argv)
         { "set-identifier",            required_argument, 0, 'I' },
         { "set-orientation",           required_argument, 0, 'o' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
-        { "set-frequency",             required_argument, 0, 'r' },
+        { "set-frequency",             required_argument, 0, 'p' },
+        { "reset-soft",                no_argument,       0, 'r' },
+        { "reset-hard",                no_argument,       0, 'R' },
         { "frequency-check",           no_argument,       0, 'F' },
         { "linearization-data-load",   required_argument, 0, 'P' },
         { "linearization-data-save",   required_argument, 0, 'Q' },
@@ -1786,7 +1830,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fiI:o:l:r:FP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fiI:o:l:p:rRFP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1809,8 +1853,14 @@ int main (int argc, char **argv)
         case 'l':
             set_sensitivity_level = strdup (optarg);
             break;
-        case 'r':
+        case 'p':
             set_frequency = strdup (optarg);
+            break;
+        case 'r':
+            reset_soft = true;
+            break;
+        case 'R':
+            reset_hard = true;
             break;
         case 'F':
             frequency_check = true;
@@ -1885,6 +1935,8 @@ int main (int argc, char **argv)
         !!set_orientation +
         !!set_sensitivity_level +
         !!set_frequency +
+        reset_soft +
+        reset_hard +
         frequency_check +
         !!linearization_data_load +
         !!linearization_data_save +
@@ -1950,6 +2002,10 @@ int main (int argc, char **argv)
         ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, set_sensitivity_level);
     else if (set_frequency)
         ret = run_set_frequency (ctx, first, bus_number, device_address, set_frequency);
+    else if (reset_soft)
+        ret = run_reset (ctx, first, bus_number, device_address, MICROTOUCH3M_DEVICE_RESET_SOFT);
+    else if (reset_hard)
+        ret = run_reset (ctx, first, bus_number, device_address, MICROTOUCH3M_DEVICE_RESET_HARD);
     else if (scope)
         ret = run_scope (ctx, scope_file, scope_stray_correction, scope_scale_thousands, first, bus_number, device_address);
     else if (frequency_check)
