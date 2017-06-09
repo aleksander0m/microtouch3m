@@ -65,6 +65,7 @@ private:
     M3MDeviceMonitorThread::signal_t m_signal;
     SDL_Rect m_strays_text_rect;
     std::string m_strays_text_string;
+    std::string m_tmp_dir;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

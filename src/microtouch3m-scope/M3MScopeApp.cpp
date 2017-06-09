@@ -143,7 +143,25 @@ void M3MScopeApp::update(uint32_t delta_time)
     if (g_make_screenshot)
     {
         g_make_screenshot = 0;
-        screenshot("./pic.ppm");
+
+        if (m_tmp_dir.empty())
+        {
+            char templ[] = "/tmp/microtouch3m-scope.XXXXXX";
+
+            if (mkdtemp(templ) == 0)
+            {
+                std::cerr << "Can't create temporary directory." << std::endl;
+            }
+            else
+            {
+                m_tmp_dir = std::string(templ);
+            }
+        }
+
+        if (!m_tmp_dir.empty())
+        {
+            screenshot(m_tmp_dir + "/pic.ppm");
+        }
     }
 
     if (m_print_fps)
