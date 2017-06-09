@@ -3,7 +3,7 @@ AC_PREREQ([2.68])
 
 dnl The microtouch3m version number
 m4_define([microtouch3m_major_version], [0])
-m4_define([microtouch3m_minor_version], [49])
+m4_define([microtouch3m_minor_version], [50])
 m4_define([microtouch3m_micro_version], [0])
 m4_define([microtouch3m_version],
           [microtouch3m_major_version.microtouch3m_minor_version.microtouch3m_micro_version])
