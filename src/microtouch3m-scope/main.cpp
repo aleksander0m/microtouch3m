@@ -26,7 +26,6 @@ static void sig_handler(int sig);
 
 enum Options
 {
-    OPT_VERSION = 1000,
     OPT_FPS_LIMIT
 };
 
@@ -47,8 +46,8 @@ int main(int argc, char *argv[])
 
     const option long_options[] = {
     { "help",        no_argument,       0,            'h' },
-    { "version",     no_argument,       0,            OPT_VERSION },
-    { "verbose",     no_argument,       0,            'v' },
+    { "version",     no_argument,       0,            'v' },
+    { "verbose",     no_argument,       0,            'd' },
     { "print-fps",   no_argument,       &print_fps,   1 },
     { "m3m-log",     no_argument,       &m3m_log,     1 },
     { "scale",       required_argument, 0,            's' },
@@ -65,7 +64,7 @@ int main(int argc, char *argv[])
 
     while (iarg != -1)
     {
-        iarg = getopt_long(argc, argv, "hvs:b:k:", long_options, &idx);
+        iarg = getopt_long(argc, argv, "hvds:b:k:", long_options, &idx);
 
         switch (iarg)
         {
@@ -77,11 +76,11 @@ int main(int argc, char *argv[])
                 print_help();
                 return 0;
 
-            case OPT_VERSION:
+            case 'v':
                 print_version();
                 return 0;
 
-            case 'v':
+            case 'd':
                 verbose = true;
                 break;
 
