@@ -26,6 +26,7 @@ namespace Utils {
     }
 
     std::string ipv4_string();
+    std::string mac();
     int32_t closest_factor(int32_t of_number, int32_t to_number);
     unsigned int gcd(unsigned int u, unsigned int v);
 };

@@ -32,7 +32,8 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
     m_chart_prog(0.0f),
     m_old_chart_prog(0.0f),
     m_clear_color(Color(0, 0, 0).map_rgb(screen_surface()->format)),
-    m_static_version_text_string("SW Version: " + std::string(PACKAGE_VERSION))
+    m_static_version_text_string("SW Version: " + std::string(PACKAGE_VERSION)),
+    m_mac_suffix(Utils::mac().substr(9, 8).erase(2, 1).erase(4, 1))
 {
     m_m3m_logger.enable(m3m_log);
 
@@ -502,5 +503,5 @@ void M3MScopeApp::make_screenshot()
         return;
     }
 
-    screenshot("/tmp/microtouch3m-scope-" + std::string(timestr) + ".ppm");
+    screenshot("/tmp/microtouch3m-scope-" + m_mac_suffix + "-" + std::string(timestr) + ".ppm");
 }

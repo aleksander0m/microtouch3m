@@ -2,6 +2,9 @@
 
 #include <iostream>
 #include <cmath>
+#include <cstdio>
+#include <sstream>
+#include <iomanip>
 
 #if !defined _GNU_SOURCE
 # define _GNU_SOURCE     /* To get defns of NI_MAXSERV and NI_MAXHOST */
@@ -16,6 +19,7 @@
 #include <linux/if_link.h>
 #include <unistd.h>
 #include <net/if.h>
+#include <netpacket/packet.h>
 
 std::string Utils::ipv4_string()
 {
@@ -32,7 +36,7 @@ std::string Utils::ipv4_string()
         if (!it->ifa_addr || it->ifa_addr->sa_family != AF_INET)
             continue;
 
-        if (!it->ifa_name | !(it->ifa_flags & IFF_BROADCAST))
+        if (!it->ifa_name || !(it->ifa_flags & IFF_BROADCAST))
             continue;
 
         char host[NI_MAXHOST];
@@ -51,6 +55,48 @@ std::string Utils::ipv4_string()
         }
 
         ret = host;
+        goto exit;
+    }
+
+exit:
+    freeifaddrs(ifaddr);
+
+    return ret;
+}
+
+std::string Utils::mac()
+{
+    std::string ret;
+
+    struct ifaddrs *ifaddr;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        std::cerr << "Error retrieving interface addresses" << std::endl;
+        goto exit;
+    }
+
+    for (struct ifaddrs *it = ifaddr; it != 0; it = it->ifa_next) {
+        if (!it->ifa_addr || it->ifa_addr->sa_family != AF_PACKET)
+            continue;
+
+        if (!it->ifa_name || !(it->ifa_flags & IFF_BROADCAST))
+            continue;
+
+        std::ostringstream oss;
+
+        oss << std::hex << std::setfill('0');
+
+        struct sockaddr_ll *s = (struct sockaddr_ll *) it->ifa_addr;
+
+        for (int i = 0; i < s->sll_halen; ++i)
+        {
+            oss << std::setw(2) << (int) s->sll_addr[i];
+
+            if (i != s->sll_halen - 1)
+                oss << ':';
+        }
+
+        ret = oss.str();
         goto exit;
     }
 
