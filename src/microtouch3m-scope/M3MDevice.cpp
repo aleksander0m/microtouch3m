@@ -68,7 +68,11 @@ void M3MDevice::print_info()
 
         get_fw_version(&fw_maj, &fw_min);
 
-        std::cout << "M3M: firmware version - " << fw_maj << "." << fw_min << std::endl;
+        std::ios::fmtflags f(std::cout.flags());
+
+        std::cout << "M3M: firmware version - " << std::hex << fw_maj << "." << fw_min << std::endl;
+
+        std::cout.flags(f);
     }
 
     std::cout << "M3M: frequency - " << get_frequency_string() << std::endl;
