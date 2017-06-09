@@ -39,6 +39,7 @@ protected:
 private:
     void create_charts();
     void draw_text(int32_t x, int32_t y, const std::string &text, bool align_right = false, bool align_bottom = false);
+    void make_screenshot();
 
     static uint32_t s_text_margin;
 
@@ -65,7 +66,6 @@ private:
     M3MDeviceMonitorThread::signal_t m_signal;
     SDL_Rect m_strays_text_rect;
     std::string m_strays_text_string;
-    std::string m_tmp_dir;
 };
 
 #endif // MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP

@@ -144,24 +144,7 @@ void M3MScopeApp::update(uint32_t delta_time)
     {
         g_make_screenshot = 0;
 
-        if (m_tmp_dir.empty())
-        {
-            char templ[] = "/tmp/microtouch3m-scope.XXXXXX";
-
-            if (mkdtemp(templ) == 0)
-            {
-                std::cerr << "Can't create temporary directory." << std::endl;
-            }
-            else
-            {
-                m_tmp_dir = std::string(templ);
-            }
-        }
-
-        if (!m_tmp_dir.empty())
-        {
-            screenshot(m_tmp_dir + "/pic.ppm");
-        }
+        make_screenshot();
     }
 
     if (m_print_fps)
@@ -498,4 +481,26 @@ void M3MScopeApp::create_charts()
 void M3MScopeApp::draw_text(int32_t x, int32_t y, const std::string &text, bool align_right, bool align_bottom)
 {
     m_bmp_font_renderer.draw(screen_surface(), x, y, text, align_right, align_bottom);
+}
+
+void M3MScopeApp::make_screenshot()
+{
+    time_t t = time(0);
+    struct tm *tmp = localtime(&t);
+
+    if (!tmp)
+    {
+        std::cerr << "localtime error" << std::endl;
+        return;
+    }
+
+    char timestr[200];
+
+    if (strftime(timestr, sizeof(timestr), "%Y-%m-%d-%H-%M-%S%z", tmp) == 0)
+    {
+        std::cerr << "strftime error" << std::endl;
+        return;
+    }
+
+    screenshot("/tmp/microtouch3m-scope-" + std::string(timestr) + ".ppm");
 }
