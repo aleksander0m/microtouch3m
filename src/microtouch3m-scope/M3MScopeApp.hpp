@@ -1,11 +1,15 @@
 #ifndef MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP
 #define MICROTOUCH_3M_SCOPE_MICROTOUCH3MSCOPEAPP_HPP
 
+#include <csignal>
+
 #include "SDLApp.hpp"
 #include "LineChart.hpp"
 #include "BitmapFontRenderer.hpp"
 #include "M3MDevice.hpp"
 #include "M3MLogger.hpp"
+
+extern volatile sig_atomic_t g_make_screenshot;
 
 class M3MScopeApp : public SDLApp
 {

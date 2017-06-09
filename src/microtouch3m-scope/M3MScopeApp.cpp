@@ -14,6 +14,8 @@
 
 #include "Utils.hpp"
 
+volatile sig_atomic_t g_make_screenshot = 0;
+
 uint32_t M3MScopeApp::s_text_margin = 20;
 
 M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t flags,
@@ -138,6 +140,12 @@ void M3MScopeApp::on_start()
 
 void M3MScopeApp::update(uint32_t delta_time)
 {
+    if (g_make_screenshot)
+    {
+        g_make_screenshot = 0;
+        screenshot("./pic.ppm");
+    }
+
     if (m_print_fps)
     {
         if ((m_title_update_time += delta_time) > 1000)

@@ -21,6 +21,7 @@
 
 static void print_help();
 static void print_version();
+static void setup_signals();
 static void sig_handler(int sig);
 
 enum Options
@@ -34,10 +35,10 @@ uint32_t opt_scale = 8000000;
 uint16_t opt_bits_per_pixel = 16;
 uint32_t opt_fps_limit = 1000;
 
-SDLApp *s_sdl_app;
-
 int main(int argc, char *argv[])
 {
+    setup_signals();
+
     bool verbose = false;
     int print_fps = 0;
     int m3m_log = 0;
@@ -189,19 +190,7 @@ int main(int argc, char *argv[])
         sdlApp.set_print_fps((bool) print_fps);
         sdlApp.set_scale(opt_scale);
 
-        s_sdl_app = &sdlApp;
-
-        if (signal(SIGUSR1, sig_handler) == SIG_ERR)
-        {
-            std::cerr << "Can't setup SIGUSR1 handler." << std::endl;
-            return 1;
-        }
-
-        int ret = sdlApp.exec();
-
-        s_sdl_app = 0;
-
-        return ret;
+        return sdlApp.exec();
     }
     catch (const std::runtime_error &e)
     {
@@ -241,12 +230,23 @@ void print_version()
               << std::endl;
 }
 
+void setup_signals()
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(struct sigaction));
+    sa.sa_handler = &sig_handler;
+
+    if (sigaction(SIGUSR1, &sa, 0) == -1)
+    {
+        std::cerr << "Can't setup SIGUSR1 handler." << std::endl;
+    }
+}
+
 void sig_handler(int sig)
 {
-    if (sig == SIGUSR1 && s_sdl_app)
+    if (sig == SIGUSR1)
     {
-        const std::string &file_path = "./pic.ppm";
-
-        s_sdl_app->screenshot(file_path);
+        g_make_screenshot = 1;
     }
 }
