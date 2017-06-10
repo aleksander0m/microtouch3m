@@ -202,9 +202,9 @@ int main(int argc, char *argv[])
 void print_help()
 {
     std::cout << std::endl
-              << "  -v, --verbose        Be verbose." << std::endl
+              << "  -d, --verbose        Be verbose." << std::endl
               << "  -h, --help           Show help." << std::endl
-              << "      --version        Show version." << std::endl
+              << "  -v, --version        Show version." << std::endl
               << "      --print-fps      Print FPS each second." << std::endl
               << "      --m3m-log        Enable microtouch3m log." << std::endl
               << "  -s, --scale          Min/max value of chart in [10K; 999999999] range. Default: " << opt_scale << std::endl
