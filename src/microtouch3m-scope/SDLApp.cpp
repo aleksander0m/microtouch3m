@@ -82,7 +82,7 @@ SDLApp::SDLApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel, uint32_t
         throw std::runtime_error(std::string("Video mode set failed: ") + SDL_GetError());
     }
 
-    if ((m_fbdev = open("/dev/fb0", O_RDWR)) <= 0)
+    if ((m_fbdev = open("/dev/fb0", O_RDWR)) < 0)
     {
         std::cerr << "Couldn't read /dev/fb0. VSYNC disabled." << std::endl;
         m_vsync = false;

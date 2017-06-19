@@ -8,9 +8,7 @@
 #include <iomanip>
 #include <algorithm>
 
-#if defined(IMX51)
 #include <fcntl.h>
-#endif
 
 #include "Utils.hpp"
 

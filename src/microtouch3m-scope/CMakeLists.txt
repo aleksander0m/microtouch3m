@@ -62,7 +62,7 @@ set(SOURCE_FILES
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-include_directories(${SDL_INCLUDE_DIR} ${SDL_IMAGE_INCLUDE_DIR} ${SDL_NET_INCLUDE_DIR})
+include_directories(${SDL_INCLUDE_DIR} ${SDL_IMAGE_INCLUDE_DIR})
 include_directories(../../)
 
 target_link_libraries(${PROJECT_NAME} ${SDL_LIBRARY} ${SDL_IMAGE_LIBRARY} ${MICROTOUCH3M_LIBRARY})
