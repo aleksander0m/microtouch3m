@@ -384,6 +384,121 @@ microtouch3m_status_t microtouch3m_device_set_sensitivity_level (microtouch3m_de
                                                                  uint8_t                level);
 
 /******************************************************************************/
+/* Extended Sensitivity */
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN:
+ *
+ * Minimum value for the Touchdown in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN 4
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX:
+ *
+ * Maximum value for the Touchdown in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX 40
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN:
+ *
+ * Minimum value for the Liftoff in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN 3
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX:
+ *
+ * Maximum value for the Liftoff in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX 40
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN:
+ *
+ * Minimum value for the Palm in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN 2
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX:
+ *
+ * Maximum value for the Palm in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX 39
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN:
+ *
+ * Minimum value for the Stray in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN 1
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX:
+ *
+ * Maximum value for the Stray in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX 38
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN:
+ *
+ * Minimum value for the Stray Alpha in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN 1
+
+/**
+ * MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX:
+ *
+ * Maximum value for the Stray Alpha in extended sensitivity configuration.
+ */
+#define MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX 16
+
+/**
+ * microtouch3m_device_get_extended_sensitivity:
+ * @dev: a #microtouch3m_device_t.
+ * @touchdown: output location to store the touchdown value.
+ * @liftoff: output location to store the liftoff value.
+ * @palm: output location to store the palm value.
+ * @stray: output location to store the stray value.
+ * @stray_alpha: output location to store the stray alpha value.
+ *
+ * Get the device extended sensitivity configuration.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_extended_sensitivity (microtouch3m_device_t *dev,
+                                                                    uint8_t               *touchdown,
+                                                                    uint8_t               *liftoff,
+                                                                    uint8_t               *palm,
+                                                                    uint8_t               *stray,
+                                                                    uint8_t               *stray_alpha);
+
+/**
+ * microtouch3m_device_set_extended_sensitivity:
+ * @dev: a #microtouch3m_device_t.
+ * @touchdown: the touchdown value.
+ * @liftoff: the liftoff value (less than @touchdown).
+ * @palm: the palm value (less than @liftoff).
+ * @stray: the stray value (less than @palm).
+ * @stray_alpha: the stray alpha value.
+ *
+ * Set the device extended sensitivity configuration.
+ *
+ * The controller must be rebooted after changing the sensitivity configuration.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_extended_sensitivity (microtouch3m_device_t *dev,
+                                                                    uint8_t                touchdown,
+                                                                    uint8_t                liftoff,
+                                                                    uint8_t                palm,
+                                                                    uint8_t                stray,
+                                                                    uint8_t                stray_alpha);
+
+/******************************************************************************/
 /* Frequencies */
 
 /**

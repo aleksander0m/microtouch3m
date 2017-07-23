@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <math.h>
 
 #include <libusb.h>
 
@@ -56,6 +57,8 @@
 #if !defined(GCC_VERSION) || GCC_VERSION < 40100
 # error GCC >= 4.1.0 required for built-in atomic method support
 #endif
+
+#define ROUNDF(value) floor (value + 0.5)
 
 /******************************************************************************/
 /* Common */
@@ -982,6 +985,300 @@ microtouch3m_device_set_sensitivity_level (microtouch3m_device_t *dev,
         return st;
 
     microtouch3m_log ("successfully set sensitivity level...");
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
+/* Extended sensitivity */
+
+#define VALUE_EXTENDED_SENSITIVITY_TOUCHDOWN   0x005a /* same as VALUE_SENSITIVITY! */
+#define VALUE_EXTENDED_SENSITIVITY_LIFTOFF     0x006a
+#define VALUE_EXTENDED_SENSITIVITY_PALM        0x00e2
+#define VALUE_EXTENDED_SENSITIVITY_STRAY       0x00e6
+#define VALUE_EXTENDED_SENSITIVITY_STRAY_ALPHA 0x0050
+
+struct parameter_report_extended_sensitivity_touchdown_s {
+    struct parameter_report_s header;
+    uint16_t value_be;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+struct parameter_report_extended_sensitivity_liftoff_s {
+    struct parameter_report_s header;
+    uint16_t value_be;
+} __attribute__((packed));
+
+struct parameter_report_extended_sensitivity_palm_s {
+    struct parameter_report_s header;
+    uint16_t value_be;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+struct parameter_report_extended_sensitivity_stray_s {
+    struct parameter_report_s header;
+    uint16_t value_be;
+} __attribute__((packed));
+
+struct parameter_report_extended_sensitivity_stray_alpha_s {
+    struct parameter_report_s header;
+    uint16_t value_be;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_extended_sensitivity (microtouch3m_device_t *dev,
+                                              uint8_t               *touchdown,
+                                              uint8_t               *liftoff,
+                                              uint8_t               *palm,
+                                              uint8_t               *stray,
+                                              uint8_t               *stray_alpha)
+{
+    struct parameter_report_extended_sensitivity_touchdown_s   parameter_report_touchdown;
+    struct parameter_report_extended_sensitivity_liftoff_s     parameter_report_liftoff;
+    struct parameter_report_extended_sensitivity_palm_s        parameter_report_palm;
+    struct parameter_report_extended_sensitivity_stray_s       parameter_report_stray;
+    struct parameter_report_extended_sensitivity_stray_alpha_s parameter_report_stray_alpha;
+    microtouch3m_status_t                                      st;
+    uint16_t                                                   value;
+    uint16_t                                                   level;
+
+    microtouch3m_log ("reading extended sensitivity: touchdown");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
+                                        VALUE_EXTENDED_SENSITIVITY_TOUCHDOWN,
+                                        (struct parameter_report_s *) &parameter_report_touchdown,
+                                        sizeof (parameter_report_touchdown),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    value = be16toh (parameter_report_touchdown.value_be);
+    level = value / 0x15;
+    if (level < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN || level > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX)
+        microtouch3m_log ("extended sensitivity: touchdown out of bounds: %u != [%u,%u] (0x%04x)",
+                          level, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX, value);
+    else
+        microtouch3m_log ("extended sensitivity: touchdown: %u (0x%04x)", level, value);
+    if (touchdown)
+        *touchdown = level;
+
+    microtouch3m_log ("reading extended sensitivity: liftoff");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
+                                        VALUE_EXTENDED_SENSITIVITY_LIFTOFF,
+                                        (struct parameter_report_s *) &parameter_report_liftoff,
+                                        sizeof (parameter_report_liftoff),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    value = be16toh (parameter_report_liftoff.value_be);
+    level = (uint16_t) ROUNDF ((((double) level) * ((double) value)) / ((double) 0x8000));
+    if (level < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN || level > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX)
+        microtouch3m_log ("extended sensitivity: liftoff out of bounds: %u != [%u,%u] (0x%04x)",
+                          level, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX, value);
+    else
+        microtouch3m_log ("extended sensitivity: liftoff: %u (0x%04x)", level, value);
+    if (liftoff)
+        *liftoff = level;
+
+    microtouch3m_log ("reading extended sensitivity: palm");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
+                                        VALUE_EXTENDED_SENSITIVITY_PALM,
+                                        (struct parameter_report_s *) &parameter_report_palm,
+                                        sizeof (parameter_report_palm),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    value = be16toh (parameter_report_palm.value_be);
+    level = value / 0x15;
+    if (level < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN || level > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX)
+        microtouch3m_log ("extended sensitivity: palm out of bounds: %u != [%u,%u] (0x%04x)",
+                          level, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX, value);
+    else
+        microtouch3m_log ("extended sensitivity: palm: %u (0x%04x)", level, value);
+    if (palm)
+        *palm = level;
+
+    microtouch3m_log ("reading extended sensitivity: stray");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
+                                        VALUE_EXTENDED_SENSITIVITY_STRAY,
+                                        (struct parameter_report_s *) &parameter_report_stray,
+                                        sizeof (parameter_report_stray),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    value = be16toh (parameter_report_stray.value_be);
+    level = (uint16_t) ROUNDF ((((double) level) * ((double) value)) / ((double) 0x8000));
+    if (level < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN || level > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX)
+        microtouch3m_log ("extended sensitivity: stray out of bounds: %u != [%u,%u] (0x%04x)",
+                          level, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX, value);
+    else
+        microtouch3m_log ("extended sensitivity: stray: %u (0x%04x)", level, value);
+    if (stray)
+        *stray = level;
+
+    microtouch3m_log ("reading extended sensitivity: stray alpha");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_SETTINGS,
+                                        VALUE_EXTENDED_SENSITIVITY_STRAY_ALPHA,
+                                        (struct parameter_report_s *) &parameter_report_stray_alpha,
+                                        sizeof (parameter_report_stray_alpha),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    value = be16toh (parameter_report_stray_alpha.value_be);
+    level = value;
+    if (level < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN || level > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX)
+        microtouch3m_log ("extended sensitivity: stray alpha out of bounds: %u != [%u,%u] (0x%04x)",
+                          level, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX, value);
+    else
+        microtouch3m_log ("extended sensitivity: stray alpha: %u (0x%04x)", level, value);
+    if (stray_alpha)
+        *stray_alpha = level;
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+struct extended_sensitivity_touchdown_s {
+    uint16_t level_be;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+struct extended_sensitivity_liftoff_s {
+    uint16_t level_be;
+} __attribute__((packed));
+
+struct extended_sensitivity_palm_s {
+    uint16_t level_be;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+struct extended_sensitivity_stray_s {
+    uint16_t level_be;
+} __attribute__((packed));
+
+struct extended_sensitivity_stray_alpha_s {
+    uint16_t level_be;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_set_extended_sensitivity (microtouch3m_device_t *dev,
+                                              uint8_t                touchdown,
+                                              uint8_t                liftoff,
+                                              uint8_t                palm,
+                                              uint8_t                stray,
+                                              uint8_t                stray_alpha)
+{
+    microtouch3m_status_t                     st;
+    struct extended_sensitivity_touchdown_s   touchdown_s   = { 0 };
+    struct extended_sensitivity_liftoff_s     liftoff_s     = { 0 };
+    struct extended_sensitivity_palm_s        palm_s        = { 0 };
+    struct extended_sensitivity_stray_s       stray_s       = { 0 };
+    struct extended_sensitivity_stray_alpha_s stray_alpha_s = { 0 };
+    uint16_t                                  value;
+
+    if (touchdown < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN || touchdown > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX) {
+        microtouch3m_log ("extended sensitivity: touchdown out of bounds: %u != [%u,%u]",
+                          touchdown, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (liftoff < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN || liftoff > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX) {
+        microtouch3m_log ("extended sensitivity: liftoff out of bounds: %u != [%u,%u]",
+                          liftoff, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (palm < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN || palm > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX) {
+        microtouch3m_log ("extended sensitivity: palm out of bounds: %u != [%u,%u]",
+                          palm, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (stray < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN || stray > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX) {
+        microtouch3m_log ("extended sensitivity: stray out of bounds: %u != [%u,%u]",
+                          stray, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (stray_alpha < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN || stray_alpha > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX) {
+        microtouch3m_log ("extended sensitivity: stray alpha out of bounds: %u != [%u,%u]",
+                          stray_alpha, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (liftoff >= touchdown && !(liftoff == touchdown && liftoff == MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX)) {
+        microtouch3m_log ("extended sensitivity: liftoff must be smaller than touchdown: %u < %u", liftoff, touchdown);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (palm >= liftoff) {
+        microtouch3m_log ("extended sensitivity: palm must be smaller than liftoff: %u < %u", palm, liftoff);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+    if (stray >= palm) {
+        microtouch3m_log ("extended sensitivity: stray must be smaller than palm: %u < %u", stray, palm);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+
+    value = touchdown * 0x15;
+    microtouch3m_log ("setting extended sensitivity: touchdown: %u (0x%04x)", touchdown, value);
+    touchdown_s.level_be   = htobe16 (value);
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
+                               VALUE_EXTENDED_SENSITIVITY_TOUCHDOWN,
+                               (const uint8_t *) &touchdown_s,
+                               sizeof (touchdown_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    microtouch3m_log ("successfully set touchdown setting...");
+
+    value = liftoff * 0x8000 / touchdown;
+    microtouch3m_log ("setting extended sensitivity: liftoff: %u (0x%04x)", liftoff, value);
+    liftoff_s.level_be = htobe16 (value);
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
+                               VALUE_EXTENDED_SENSITIVITY_LIFTOFF,
+                               (const uint8_t *) &liftoff_s,
+                               sizeof (liftoff_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    microtouch3m_log ("successfully set liftoff setting...");
+
+    value = palm * 0x15;
+    microtouch3m_log ("setting extended sensitivity: palm: %u (0x%04x)", palm, value);
+    palm_s.level_be = htobe16 (value);
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
+                               VALUE_EXTENDED_SENSITIVITY_PALM,
+                               (const uint8_t *) &palm_s,
+                               sizeof (palm_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    microtouch3m_log ("successfully set palm setting...");
+
+    value = stray * 0x8000 / palm;
+    microtouch3m_log ("setting extended sensitivity: stray: %u (0x%04x)", stray, value);
+    stray_s.level_be = htobe16 (value);
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
+                               VALUE_EXTENDED_SENSITIVITY_STRAY,
+                               (const uint8_t *) &stray_s,
+                               sizeof (stray_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    microtouch3m_log ("successfully set stray setting...");
+
+    microtouch3m_log ("setting extended sensitivity: stray alpha: %u (0x%04x)", stray_alpha, stray_alpha);
+    stray_alpha_s.level_be = htobe16 (stray_alpha);
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_SETTINGS,
+                               VALUE_EXTENDED_SENSITIVITY_STRAY_ALPHA,
+                               (const uint8_t *) &stray_alpha_s,
+                               sizeof (stray_alpha_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+    microtouch3m_log ("successfully set stray alpha setting...");
+
     return MICROTOUCH3M_STATUS_OK;
 }
 

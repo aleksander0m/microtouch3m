@@ -435,6 +435,27 @@ run_info (microtouch3m_context_t *ctx,
         printf ("\tfrequency:         %s\n", microtouch3m_device_frequency_to_string (freq));
     } while (0);
 
+    /* Extended sensitivity */
+    do {
+        uint8_t touchdown;
+        uint8_t liftoff;
+        uint8_t palm;
+        uint8_t stray;
+        uint8_t stray_alpha;
+
+        if ((st = microtouch3m_device_get_extended_sensitivity (dev, &touchdown, &liftoff, &palm, &stray, &stray_alpha)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get extended sensitivity information: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+
+        printf ("\textended sensitivity:\n");
+        printf ("\t\ttouchdown:   %2u\n", touchdown);
+        printf ("\t\tliftoff:     %2u\n", liftoff);
+        printf ("\t\tpalm:        %2u\n", palm);
+        printf ("\t\tstray:       %2u\n", stray);
+        printf ("\t\tstray alpha: %2u\n", stray_alpha);
+    } while (0);
+
     /* Linearization data */
     printf ("linearization data:\n");
     do {
@@ -596,6 +617,122 @@ run_set_sensitivity_level (microtouch3m_context_t *ctx,
     }
 
     printf ("successfully set sensitivity level to: %lu\n", aux);
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: set sensitivity level */
+
+static int
+run_set_extended_sensitivity (microtouch3m_context_t *ctx,
+                              bool                    first,
+                              uint8_t                 bus_number,
+                              uint8_t                 device_address,
+                              const char             *str)
+{
+    microtouch3m_device_t *dev = NULL;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+    unsigned int           touchdown, liftoff, palm, stray, stray_alpha;
+    uint8_t                touchdown_r, liftoff_r, palm_r, stray_r, stray_alpha_r;
+    int                    n_errors = 0;
+
+    if (sscanf (str, "%u,%u,%u,%u,%u", &touchdown, &liftoff, &palm, &stray, &stray_alpha) != 5) {
+        fprintf (stderr, "error: invalid configuration string given: %s\n", str);
+        goto out;
+    }
+
+    if (touchdown < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN || touchdown > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX) {
+        fprintf (stderr, "cannot set extended sensitivity: touchdown out of bounds: %u != [%u,%u]\n",
+                          touchdown, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_TOUCHDOWN_MAX);
+        goto out;
+    }
+    if (liftoff < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN || liftoff > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX) {
+        fprintf (stderr, "cannot set extended sensitivity: liftoff out of bounds: %u != [%u,%u]\n",
+                          liftoff, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX);
+        goto out;
+    }
+    if (palm < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN || palm > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX) {
+        fprintf (stderr, "cannot set extended sensitivity: palm out of bounds: %u != [%u,%u]\n",
+                          palm, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_PALM_MAX);
+        goto out;
+    }
+    if (stray < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN || stray > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX) {
+        fprintf (stderr, "cannot set extended sensitivity: stray out of bounds: %u != [%u,%u]\n",
+                          stray, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_MAX);
+        goto out;
+    }
+    if (stray_alpha < MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN || stray_alpha > MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX) {
+        fprintf (stderr, "cannot set extended sensitivity: stray alpha out of bounds: %u != [%u,%u]\n",
+                          stray_alpha, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MIN, MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_STRAY_ALPHA_MAX);
+        goto out;
+    }
+    if ((liftoff >= touchdown) && !(liftoff == touchdown && liftoff == MICROTOUCH3M_DEVICE_EXTENDED_SENSITIVITY_LIFTOFF_MAX)) {
+        fprintf (stderr, "cannot set extended sensitivity: liftoff must be smaller than touchdown: %u < %u\n", liftoff, touchdown);
+        goto out;
+    }
+    if (palm >= liftoff) {
+        fprintf (stderr, "cannot set extended sensitivity: palm must be smaller than liftoff: %u < %u\n", palm, liftoff);
+        goto out;
+    }
+    if (stray >= palm) {
+        fprintf (stderr, "cannot set extended sensitivity: stray must be smaller than palm: %u < %u\n", stray, palm);
+        goto out;
+    }
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_set_extended_sensitivity (dev, (uint8_t) touchdown, (uint8_t) liftoff, (uint8_t) palm, (uint8_t) stray, (uint8_t) stray_alpha )) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set extended sensitivity: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    dev = reboot_and_wait_device (ctx, dev);
+    if (!dev) {
+        fprintf (stderr, "error: controller didn't reboot correctly\n");
+        goto out;
+    }
+
+    if ((st = microtouch3m_device_get_extended_sensitivity (dev, &touchdown_r, &liftoff_r, &palm_r, &stray_r, &stray_alpha_r)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't get extended sensitivity after update: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    if (touchdown != touchdown_r) {
+        fprintf (stderr, "error: extended sensitivity setting failed (requested touchdown %u, real %u)\n", touchdown, touchdown_r);
+        n_errors++;
+    }
+    if (liftoff != liftoff_r) {
+        fprintf (stderr, "error: extended sensitivity setting failed (requested liftoff %u, real %u)\n", liftoff, liftoff_r);
+        n_errors++;
+    }
+    if (palm != palm_r) {
+        fprintf (stderr, "error: extended sensitivity setting failed (requested palm %u, real %u)\n", palm, palm_r);
+        n_errors++;
+    }
+    if (stray != stray_r) {
+        fprintf (stderr, "error: extended sensitivity setting failed (requested stray %u, real %u)\n", stray, stray_r);
+        n_errors++;
+    }
+    if (stray_alpha != stray_alpha_r) {
+        fprintf (stderr, "error: extended sensitivity setting failed (requested stray alpha %u, real %u)\n", stray_alpha, stray_alpha_r);
+        n_errors++;
+    }
+    if (n_errors > 0)
+        goto out;
+
+    printf ("successfully set extended sensitivity:\n");
+    printf ("\ttouchdown:   %2u\n", touchdown);
+    printf ("\tliftoff:     %2u\n", liftoff);
+    printf ("\tpalm:        %2u\n", palm);
+    printf ("\tstray:       %2u\n", stray);
+    printf ("\tstray alpha: %2u\n", stray_alpha);
     ret = EXIT_SUCCESS;
 
 out:
@@ -1655,49 +1792,50 @@ print_help (void)
             "Usage: " PROGRAM_NAME " <option>\n"
             "\n"
             "Device discovery options\n"
-            "  -n, --list                             List all devices found..\n"
+            "  -n, --list                                   List all devices found..\n"
             "\n"
             "Generic device selection options\n"
-            "  -s, --bus-dev=[BUS]:[DEV]              Select device by bus and/or device number.\n"
-            "  -f, --first                            Select first device found.\n"
+            "  -s, --bus-dev=[BUS]:[DEV]                    Select device by bus and/or device number.\n"
+            "  -f, --first                                  Select first device found.\n"
             "\n"
             "Common device actions:\n"
-            "  -i, --info                             Show device information.\n"
-            "  -I, --set-identifier=[HH:HH:HH:HH]     Set the 4 byte identifier.\n"
-            "  -o, --set-orientation=[OR]             Set the orientation (See Notes).\n"
-            "  -l, --set-sensitivity-level=[LVL]      Set sensitivity level (See Notes).\n"
-            "  -p, --set-frequency=[FREQ]             Set frequency (See Notes).\n"
+            "  -i, --info                                   Show device information.\n"
+            "  -I, --set-identifier=[HH:HH:HH:HH]           Set the 4 byte identifier.\n"
+            "  -o, --set-orientation=[OR]                   Set the orientation (See Notes).\n"
+            "  -l, --set-sensitivity-level=[LVL]            Set sensitivity level (See Notes).\n"
+            "  -L, --set-extended-sensitivity=[T,L,P,S,Sa]  Set extended sensitivity settings (See Notes).\n"
+            "  -p, --set-frequency=[FREQ]                   Set frequency (See Notes).\n"
             "\n"
             "Reset actions:\n"
-            "  -r, --reset-soft                       Perform a soft reset.\n"
-            "  -R, --reset-hard                       Perform a hard reset.\n"
+            "  -r, --reset-soft                             Perform a soft reset.\n"
+            "  -R, --reset-hard                             Perform a hard reset.\n"
             "\n"
             "Frequency check device actions:\n"
-            "  -F, --frequency-check                  Run frequency check mode.\n"
+            "  -F, --frequency-check                        Run frequency check mode.\n"
             "\n"
             "Linearization data actions:\n"
-            "  -P, --linearization-data-load=[PATH]   Load linearization data from a .bk2 file.\n"
-            "  -Q, --linearization-data-save=[PATH]   Save linearization data to a .bk2 file.\n"
+            "  -P, --linearization-data-load=[PATH]         Load linearization data from a .bk2 file.\n"
+            "  -Q, --linearization-data-save=[PATH]         Save linearization data to a .bk2 file.\n"
             "\n"
             "Scope device actions:\n"
-            "  -S, --scope                            Run scope mode.\n"
-            "  -O, --scope-file=[PATH]                Store the scope results in an output file.\n"
-            "  -C, --scope-stray-correction           Perform stray correction during the scope operation.\n"
-            "  -T, --scope-scale-thousands            Scale the values by 1000.\n"
+            "  -S, --scope                                  Run scope mode.\n"
+            "  -O, --scope-file=[PATH]                      Store the scope results in an output file.\n"
+            "  -C, --scope-stray-correction                 Perform stray correction during the scope operation.\n"
+            "  -T, --scope-scale-thousands                  Scale the values by 1000.\n"
             "\n"
             "Firmware device actions:\n"
-            "  -x, --firmware-dump=[PATH]             Dump firmware to a file.\n"
-            "  -u, --firmware-update=[PATH]           Update firmware in the device (See Notes).\n"
-            "  -N, --skip-removing-data-backup        Don't remove data backup on firmware update success.\n"
-            "  -B, --restore-data-backup=[PATH]       Restore the given device data (See Notes).\n"
+            "  -x, --firmware-dump=[PATH]                   Dump firmware to a file.\n"
+            "  -u, --firmware-update=[PATH]                 Update firmware in the device (See Notes).\n"
+            "  -N, --skip-removing-data-backup              Don't remove data backup on firmware update success.\n"
+            "  -B, --restore-data-backup=[PATH]             Restore the given device data (See Notes).\n"
             "\n"
             "Firmware file actions:\n"
-            "  -z, --validate-fw-file=[PATH]          Validate firmware file.\n"
+            "  -z, --validate-fw-file=[PATH]                Validate firmware file.\n"
             "\n"
             "Common options:\n"
-            "  -d, --debug                            Enable verbose logging.\n"
-            "  -h, --help                             Show help.\n"
-            "  -v, --version                          Show version.\n"
+            "  -d, --debug                                  Enable verbose logging.\n"
+            "  -h, --help                                   Show help.\n"
+            "  -v, --version                                Show version.\n"
             "\n"
             "Notes:\n"
             "  * The --firmware-update action will perform a controller reboot automatically.\n"
@@ -1708,6 +1846,13 @@ print_help (void)
             "\n"
             "  * The --set-sensitivity-level action will perform a controller reboot automatically.\n"
             "  * The [LVL] value in --set-sensitivity-level may be any between 0 (min) and 6 (max).\n"
+            "\n"
+            "  * The [T,L,P,S,Sa] sequence of values in --set-extended-sensitivity contains:\n"
+            "      T:  Touchdown value   [4,40].\n"
+            "      L:  Liftoff value     [3,40] (must be less than Touchdown).\n"
+            "      P:  Palm value        [2,39] (must be less than Liftoff).\n"
+            "      S:  Stray value       [1,38] (must be less than Palm).\n"
+            "      Sa: Stray alpha value [1,16].\n"
             "\n"
             "  * The [FREQ] value in --set-frequency is given in mHz, and may be any of:\n"
             "    70135, 76953, 85286, 95703, 109096\n"
@@ -1780,6 +1925,7 @@ int main (int argc, char **argv)
     char                   *set_identifier            = NULL;
     char                   *set_orientation           = NULL;
     char                   *set_sensitivity_level     = NULL;
+    char                   *set_extended_sensitivity  = NULL;
     char                   *set_frequency             = NULL;
     bool                    reset_soft                = false;
     bool                    reset_hard                = false;
@@ -1806,6 +1952,7 @@ int main (int argc, char **argv)
         { "set-identifier",            required_argument, 0, 'I' },
         { "set-orientation",           required_argument, 0, 'o' },
         { "set-sensitivity-level",     required_argument, 0, 'l' },
+        { "set-extended-sensitivity",  required_argument, 0, 'L' },
         { "set-frequency",             required_argument, 0, 'p' },
         { "reset-soft",                no_argument,       0, 'r' },
         { "reset-hard",                no_argument,       0, 'R' },
@@ -1830,7 +1977,7 @@ int main (int argc, char **argv)
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fiI:o:l:p:rRFP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fiI:o:l:L:p:rRFP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -1852,6 +1999,9 @@ int main (int argc, char **argv)
             break;
         case 'l':
             set_sensitivity_level = strdup (optarg);
+            break;
+        case 'L':
+            set_extended_sensitivity = strdup (optarg);
             break;
         case 'p':
             set_frequency = strdup (optarg);
@@ -1934,6 +2084,7 @@ int main (int argc, char **argv)
         !!set_identifier +
         !!set_orientation +
         !!set_sensitivity_level +
+        !!set_extended_sensitivity +
         !!set_frequency +
         reset_soft +
         reset_hard +
@@ -2000,6 +2151,8 @@ int main (int argc, char **argv)
         ret = run_set_orientation (ctx, first, bus_number, device_address, set_orientation);
     else if (set_sensitivity_level)
         ret = run_set_sensitivity_level (ctx, first, bus_number, device_address, set_sensitivity_level);
+    else if (set_extended_sensitivity)
+        ret = run_set_extended_sensitivity (ctx, first, bus_number, device_address, set_extended_sensitivity);
     else if (set_frequency)
         ret = run_set_frequency (ctx, first, bus_number, device_address, set_frequency);
     else if (reset_soft)
@@ -2033,6 +2186,7 @@ out:
     free (firmware_update);
     free (restore_data_backup);
     free (validate_fw_file);
+    free (set_extended_sensitivity);
     free (set_sensitivity_level);
     free (set_orientation);
     free (set_identifier);
