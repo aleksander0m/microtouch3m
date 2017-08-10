@@ -58,7 +58,15 @@ public:
     void read_strays();
     void get_fw_version(int *major, int *minor);
     std::string get_frequency_string();
+    void get_sensitivity_info();
+    uint8_t sensitivity_level() const;
+    uint8_t touchdown() const;
+    uint8_t liftoff() const;
+    uint8_t palm() const;
+    uint8_t stray() const;
+    uint8_t stray_alpha() const;
     void monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data);
+
 private:
     M3MContext m_ctx;
     microtouch3m_device_t *m_dev;
@@ -70,6 +78,8 @@ private:
     int m_fw_major;
     int m_fw_minor;
     std::string m_frequency_str;
+    uint8_t m_sensitivity_level;
+    uint8_t m_touchdown, m_liftoff, m_palm, m_stray, m_stray_alpha;
 };
 
 class M3MDeviceMonitorThread : public Thread

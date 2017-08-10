@@ -104,13 +104,87 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 
             m_static_text_string = oss.str();
         }
+
+        m3m_dev.get_sensitivity_info();
+
+        {
+            std::vector<size_t> len_value, len_label;
+
+            std::string sensitivity_level;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.sensitivity_level();
+                sensitivity_level = oss.str();
+            }
+            const std::string label_sensitivity_level = "Sensitivity Level: ";
+            len_value.push_back(sensitivity_level.length());
+            len_label.push_back(label_sensitivity_level.length());
+
+            std::string touchdown;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.touchdown();
+                touchdown = oss.str();
+            }
+            const std::string label_touchdown = "Touchdown: ";
+            len_value.push_back(touchdown.length());
+            len_label.push_back(label_touchdown.length());
+
+            std::string liftoff;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.liftoff();
+                liftoff = oss.str();
+            }
+            const std::string label_liftoff = "Liftoff: ";
+            len_value.push_back(liftoff.length());
+            len_label.push_back(label_liftoff.length());
+
+            std::string palm;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.palm();
+                palm = oss.str();
+            }
+            const std::string label_palm = "Palm: ";
+            len_value.push_back(palm.length());
+            len_label.push_back(label_palm.length());
+
+            std::string stray;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.stray();
+                stray = oss.str();
+            }
+            const std::string label_stray = "Stray: ";
+            len_value.push_back(stray.length());
+            len_label.push_back(label_stray.length());
+
+            std::string stray_alpha;
+            {
+                std::ostringstream oss;
+                oss << (int) m3m_dev.stray_alpha();
+                stray_alpha = oss.str();
+            }
+            const std::string label_stray_alpha = "Stray Alpha: ";
+            len_value.push_back(stray_alpha.length());
+            len_label.push_back(label_stray_alpha.length());
+
+            const int w1 = (const int) *std::max_element(len_label.begin(), len_label.end());
+            const int w2 = (const int) *std::max_element(len_value.begin(), len_value.end());
+
+            std::ostringstream oss;
+            oss << std::left << std::setw(w1) << label_sensitivity_level << std::right << std::setw(w2) << sensitivity_level << std::endl
+                << std::left << std::setw(w1) << label_touchdown << std::right << std::setw(w2) << touchdown << std::endl
+                << std::left << std::setw(w1) << label_liftoff << std::right << std::setw(w2) << liftoff << std::endl
+                << std::left << std::setw(w1) << label_palm << std::right << std::setw(w2) << palm << std::endl
+                << std::left << std::setw(w1) << label_stray << std::right << std::setw(w2) << stray << std::endl
+                << std::left << std::setw(w1) << label_stray_alpha << std::right << std::setw(w2) << stray_alpha << std::endl;
+
+            m_sensitivity_info_string = oss.str();
+        }
     }
 #endif
-
-    m_strays_text_rect.x = screen_surface()->w - 175;
-    m_strays_text_rect.y = 80;
-    m_strays_text_rect.w = 160;
-    m_strays_text_rect.h = 70;
 
     set_scale(10000000);
 
@@ -335,6 +409,9 @@ void M3MScopeApp::draw()
                 m_strays_text_rect.h = (Uint16) m_bmp_font_renderer.text_height(m_strays_text_string);
                 m_strays_text_rect.w = (Uint16) text_width;
                 m_strays_text_rect.x = screen_surface()->w - s_text_margin - m_strays_text_rect.w;
+                m_strays_text_rect.y = s_text_margin + m_bmp_font_renderer.text_height(m_static_text_string)
+                                       + s_text_margin + m_bmp_font_renderer.text_height(m_sensitivity_info_string)
+                                       + s_text_margin;
 
                 SDL_FillRect(screen_surface(), &m_strays_text_rect, m_clear_color);
 
@@ -416,6 +493,9 @@ void M3MScopeApp::draw()
     }
 
     draw_text(screen_surface()->w - text_margin, text_margin, m_static_text_string, true);
+
+    draw_text(screen_surface()->w - text_margin, text_margin * 2 + m_bmp_font_renderer.text_height(m_static_text_string),
+              m_sensitivity_info_string, true);
 
     draw_text(m_strays_text_rect.x + m_strays_text_rect.w, m_strays_text_rect.y, m_strays_text_string, true);
 

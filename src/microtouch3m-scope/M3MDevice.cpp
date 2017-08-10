@@ -56,7 +56,13 @@ M3MDevice::M3MDevice() :
     m_ll_stray_signal(0),
     m_lr_stray_signal(0),
     m_fw_major(-1),
-    m_fw_minor(-1)
+    m_fw_minor(-1),
+    m_sensitivity_level(0),
+    m_touchdown(0),
+    m_liftoff(0),
+    m_palm(0),
+    m_stray(0),
+    m_stray_alpha(0)
 {
     if (!(m_dev = microtouch3m_device_new_first(m_ctx.context())))
     {
@@ -168,6 +174,54 @@ std::string M3MDevice::get_frequency_string()
     }
 
     return m_frequency_str;
+}
+
+void M3MDevice::get_sensitivity_info()
+{
+    microtouch3m_status_t st;
+
+    if ((st = microtouch3m_device_get_sensitivity_level(m_dev, &m_sensitivity_level)) != MICROTOUCH3M_STATUS_OK)
+    {
+        throw std::runtime_error("M3M: Couldn't get sensitivity level - "
+                                 + std::string(microtouch3m_status_to_string(st)));
+    }
+
+    if ((st = microtouch3m_device_get_extended_sensitivity(m_dev, &m_touchdown, &m_liftoff, &m_palm,
+                                                           &m_stray, &m_stray_alpha)) != MICROTOUCH3M_STATUS_OK)
+    {
+        throw std::runtime_error("M3M: Couldn't get extended sensitivity - "
+                                 + std::string(microtouch3m_status_to_string(st)));
+    }
+}
+
+uint8_t M3MDevice::sensitivity_level() const
+{
+    return m_sensitivity_level;
+}
+
+uint8_t M3MDevice::touchdown() const
+{
+    return m_touchdown;
+}
+
+uint8_t M3MDevice::liftoff() const
+{
+    return m_liftoff;
+}
+
+uint8_t M3MDevice::palm() const
+{
+    return m_palm;
+}
+
+uint8_t M3MDevice::stray() const
+{
+    return m_stray;
+}
+
+uint8_t M3MDevice::stray_alpha() const
+{
+    return m_stray_alpha;
 }
 
 void M3MDevice::monitor_async_reports(microtouch3m_device_async_report_scope_f *callback, void *user_data)

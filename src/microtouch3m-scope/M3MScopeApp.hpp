@@ -88,6 +88,7 @@ private:
     M3MDeviceMonitorThread::signal_t m_signal;
     SDL_Rect m_strays_text_rect;
     std::string m_strays_text_string;
+    std::string m_sensitivity_info_string;
     std::string m_mac_suffix;
 };
 
