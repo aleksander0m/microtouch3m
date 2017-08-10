@@ -48,7 +48,7 @@ static void sig_handler(int sig);
 
 enum Options
 {
-    OPT_FPS_LIMIT
+    OPT_FPS_LIMIT = 1000
 };
 
 uint32_t opt_samples = 4000;
