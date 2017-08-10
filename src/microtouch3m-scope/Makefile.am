@@ -4,7 +4,7 @@ if BUILD_SCOPE
 bin_PROGRAMS = microtouch3m-scope
 
 microtouch3m_scope_SOURCES = \
-	font_13x16.xpm font_25x32.xpm \
+	font_9x12.xpm \
 	Thread.cpp Thread.hpp \
 	Mutex.cpp Mutex.hpp \
 	M3MLogger.cpp M3MLogger.hpp \
@@ -37,6 +37,5 @@ microtouch3m_scope_LDADD = \
 endif
 
 EXTRA_DIST = \
-	font_13x16.xcf \
-	font_25x32.xcf \
+	font_9x12.xcf \
 	$(NULL)

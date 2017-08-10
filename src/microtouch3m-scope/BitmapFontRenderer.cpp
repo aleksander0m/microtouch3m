@@ -27,25 +27,12 @@
 /* Ignore ISO C++ warnings when including font xpm files */
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
-#if 0
+#include "font_9x12.xpm"
 
-#include "font_25x32.xpm"
+const int BitmapFontRenderer::s_font_w = 9;
+const int BitmapFontRenderer::s_font_h = 12;
 
-const int BitmapFontRenderer::s_font_w = 25;
-const int BitmapFontRenderer::s_font_h = 32;
-
-#define FONT_NAME font_25x32_xpm
-
-#else
-
-#include "font_13x16.xpm"
-
-const int BitmapFontRenderer::s_font_w = 13;
-const int BitmapFontRenderer::s_font_h = 16;
-
-#define FONT_NAME font_13x16_xpm
-
-#endif
+#define FONT_NAME font_9x12_xpm
 
 /* Recover ISO C++ warnings */
 #pragma GCC diagnostic warning "-Wwrite-strings"
