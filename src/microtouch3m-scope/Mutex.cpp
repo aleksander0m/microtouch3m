@@ -24,6 +24,7 @@
 
 #include <stdexcept>
 #include <cstring>
+#include <iostream>
 
 Mutex::Mutex()
 {
@@ -38,7 +39,7 @@ Mutex::~Mutex()
     int error;
     if ((error = pthread_mutex_destroy(&m_mut)))
     {
-        throw std::runtime_error("Couldn't destroy mutex: " + std::string(strerror(error)));
+        std::cerr << "Couldn't destroy mutex: " << std::string(strerror(error)) << std::endl;
     }
 }
 
