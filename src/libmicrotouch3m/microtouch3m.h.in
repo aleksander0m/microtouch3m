@@ -737,6 +737,33 @@ microtouch3m_status_t microtouch3m_device_set_orientation (microtouch3m_device_t
                                                            microtouch3m_device_orientation_t  orientation);
 
 /******************************************************************************/
+/* Constant touch timeout configuration */
+
+/**
+ * microtouch3m_device_get_constant_touch_timeout:
+ * @dev: a #microtouch3m_device_t.
+ * @timeout_ms: output location to store the timeout value, in ms.
+ *
+ * Get the constant touch timeout.
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_get_constant_touch_timeout (microtouch3m_device_t *dev,
+                                                                      unsigned int          *timeout_ms);
+
+/**
+ * microtouch3m_device_set_constant_touch_timeout:
+ * @dev: a #microtouch3m_device_t.
+ * @timeout_ms: the timeout, in ms.
+ *
+ * Set the constant touch timeout value (must be a multiple of 100ms).
+ *
+ * Returns: a #microtouch3m_status_t.
+ */
+microtouch3m_status_t microtouch3m_device_set_constant_touch_timeout (microtouch3m_device_t *dev,
+                                                                      unsigned int           timeout_ms);
+
+/******************************************************************************/
 /* Read strays */
 
 /**

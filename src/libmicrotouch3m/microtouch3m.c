@@ -1390,6 +1390,107 @@ microtouch3m_device_set_frequency (microtouch3m_device_t           *dev,
 }
 
 /******************************************************************************/
+/* Constant touch timeout configuration */
+
+#define CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK 100
+#define VALUE_CONSTANT_TOUCH_TIMEOUT       0x0600
+
+struct constant_touch_timeout_s {
+    uint8_t  unknown_field[8];
+    uint16_t timeout_ticks_be;
+    uint16_t no_idea_just_zero_it;
+} __attribute__((packed));
+
+struct parameter_report_constant_touch_timeout_s {
+    struct parameter_report_s       header;
+    struct constant_touch_timeout_s data;
+} __attribute__((packed));
+
+microtouch3m_status_t
+microtouch3m_device_get_constant_touch_timeout (microtouch3m_device_t *dev,
+                                                unsigned int          *timeout_ms)
+{
+    microtouch3m_status_t                            st;
+    struct parameter_report_constant_touch_timeout_s parameter_report;
+    uint16_t                                         timeout_ticks;
+
+    microtouch3m_log ("reading constant touch timeout");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_NOVRAM,
+                                        VALUE_CONSTANT_TOUCH_TIMEOUT,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    timeout_ticks = be16toh (parameter_report.data.timeout_ticks_be);
+
+    if (timeout_ticks > 0xff) {
+        microtouch3m_log ("invalid constant touch timeout: (%hu)", timeout_ticks);
+        return MICROTOUCH3M_STATUS_INVALID_DATA;
+    }
+
+    if (timeout_ms)
+        *timeout_ms = timeout_ticks * CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK;
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+microtouch3m_status_t
+microtouch3m_device_set_constant_touch_timeout (microtouch3m_device_t *dev,
+                                                unsigned int           timeout_ms)
+{
+    microtouch3m_status_t                            st;
+    struct parameter_report_constant_touch_timeout_s parameter_report;
+    uint16_t                                         read_timeout_ticks;
+    uint16_t                                         write_timeout_ticks;
+
+    if ((timeout_ms % CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK) != 0) {
+        microtouch3m_log ("invalid constant touch timeout specified: not a multiple of %ms (%u)",
+                          CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK, timeout_ms);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+
+    write_timeout_ticks = timeout_ms / CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK;
+    if (write_timeout_ticks > 0xff) {
+        microtouch3m_log ("invalid constant touch timeout specified: too big (%u > %u)",
+                          timeout_ms, 0xff * CONSTANT_TOUCH_TIMEOUT_MS_PER_TICK);
+        return MICROTOUCH3M_STATUS_INVALID_ARGUMENTS;
+    }
+
+    microtouch3m_log ("reading constant touch timeout before update");
+    if ((st = run_parameter_in_request (dev,
+                                        REQUEST_GET_PARAMETER_BLOCK,
+                                        PARAMETER_ID_CONTROLLER_NOVRAM,
+                                        VALUE_CONSTANT_TOUCH_TIMEOUT,
+                                        (struct parameter_report_s *) &parameter_report,
+                                        sizeof (parameter_report),
+                                        NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    read_timeout_ticks = be16toh (parameter_report.data.timeout_ticks_be);
+    if (read_timeout_ticks == write_timeout_ticks) {
+        microtouch3m_log ("no need to update, constant touch timeout already the desired one");
+        return MICROTOUCH3M_STATUS_OK;
+    }
+
+    /* Update ticks in the data we're going to send */
+    parameter_report.data.timeout_ticks_be = htobe16 (write_timeout_ticks);
+
+    if ((st = run_out_request (dev,
+                               REQUEST_SET_PARAMETER_BLOCK,
+                               PARAMETER_ID_CONTROLLER_NOVRAM,
+                               VALUE_CONSTANT_TOUCH_TIMEOUT,
+                               (const uint8_t *) &parameter_report.data,
+                               sizeof (struct constant_touch_timeout_s),
+                               NULL)) != MICROTOUCH3M_STATUS_OK)
+        return st;
+
+    return MICROTOUCH3M_STATUS_OK;
+}
+
+/******************************************************************************/
 /* Read strays */
 
 struct parameter_report_read_strays_s {
