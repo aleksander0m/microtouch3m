@@ -470,6 +470,19 @@ run_info (microtouch3m_context_t *ctx,
 
     } while (0);
 
+    /* Constant touch settings */
+    printf ("constant touch:\n");
+    do {
+        unsigned int timeout_ms;
+
+        if ((st = microtouch3m_device_get_constant_touch_timeout (dev, &timeout_ms)) != MICROTOUCH3M_STATUS_OK) {
+            fprintf (stderr, "error: couldn't get constant touch timeout: %s\n", microtouch3m_status_to_string (st));
+            break;
+        }
+
+        printf ("\ttimeout: %ums\n", timeout_ms);
+    } while (0);
+
     ret = EXIT_SUCCESS;
 
 out:
@@ -816,6 +829,45 @@ run_set_frequency (microtouch3m_context_t *ctx,
     }
 
     printf ("successfully set frequency to: %s\n", microtouch3m_device_frequency_to_string (freq_id[i].id));
+    ret = EXIT_SUCCESS;
+
+out:
+    if (dev)
+        microtouch3m_device_unref (dev);
+    return ret;
+}
+
+/******************************************************************************/
+/* ACTION: set constant touch timeout */
+
+static int
+run_set_constant_touch_timeout (microtouch3m_context_t *ctx,
+                                bool                    first,
+                                uint8_t                 bus_number,
+                                uint8_t                 device_address,
+                                const char             *constant_touch_timeout_str)
+{
+    microtouch3m_device_t *dev = NULL;
+    microtouch3m_status_t  st;
+    int                    ret = EXIT_FAILURE;
+    unsigned long          aux;
+
+    errno = 0;
+    aux = strtoul (constant_touch_timeout_str, NULL, 10);
+    if (errno) {
+        fprintf (stderr, "error: invalid constant touch timeout value given: %s\n", constant_touch_timeout_str);
+        goto out;
+    }
+
+    if (!(dev = create_device (ctx, first, bus_number, device_address, NULL, 0)))
+        goto out;
+
+    if ((st = microtouch3m_device_set_constant_touch_timeout (dev, (unsigned int) aux)) != MICROTOUCH3M_STATUS_OK) {
+        fprintf (stderr, "error: couldn't set constant touch timeout: %s\n", microtouch3m_status_to_string (st));
+        goto out;
+    }
+
+    printf ("successfully updated constant touch timeout\n");
     ret = EXIT_SUCCESS;
 
 out:
@@ -1805,6 +1857,7 @@ print_help (void)
             "  -l, --set-sensitivity-level=[LVL]            Set sensitivity level (See Notes).\n"
             "  -L, --set-extended-sensitivity=[T,L,P,S,Sa]  Set extended sensitivity settings (See Notes).\n"
             "  -p, --set-frequency=[FREQ]                   Set frequency (See Notes).\n"
+            "  -c, --set-constant-touch-timeout=[MS]        Set constant touch timeout (multiple of 100ms).\n"
             "\n"
             "Reset actions:\n"
             "  -r, --reset-soft                             Perform a soft reset.\n"
@@ -1914,70 +1967,72 @@ int main (int argc, char **argv)
 {
     unsigned int            n_actions;
     unsigned int            n_actions_require_device;
-    microtouch3m_context_t *ctx                       = NULL;
-    int                     idx, iarg                 = 0;
-    bool                    list                      = false;
-    char                   *bus_number_device_address = NULL;
-    uint8_t                 bus_number                = 0;
-    uint8_t                 device_address            = 0;
-    bool                    first                     = false;
-    bool                    info                      = false;
-    char                   *set_identifier            = NULL;
-    char                   *set_orientation           = NULL;
-    char                   *set_sensitivity_level     = NULL;
-    char                   *set_extended_sensitivity  = NULL;
-    char                   *set_frequency             = NULL;
-    bool                    reset_soft                = false;
-    bool                    reset_hard                = false;
-    bool                    frequency_check           = false;
-    char                   *linearization_data_load   = NULL;
-    char                   *linearization_data_save   = NULL;
-    bool                    scope                     = false;
-    char                   *scope_file                = NULL;
-    bool                    scope_stray_correction    = false;
-    bool                    scope_scale_thousands     = false;
-    char                   *firmware_dump             = NULL;
-    char                   *firmware_update           = NULL;
-    bool                    skip_removing_data_backup = false;
-    char                   *restore_data_backup       = NULL;
-    char                   *validate_fw_file          = NULL;
-    bool                    debug                     = false;
-    int                     ret                       = EXIT_FAILURE;
+    microtouch3m_context_t *ctx                        = NULL;
+    int                     idx, iarg                  = 0;
+    bool                    list                       = false;
+    char                   *bus_number_device_address  = NULL;
+    uint8_t                 bus_number                 = 0;
+    uint8_t                 device_address             = 0;
+    bool                    first                      = false;
+    bool                    info                       = false;
+    char                   *set_identifier             = NULL;
+    char                   *set_orientation            = NULL;
+    char                   *set_sensitivity_level      = NULL;
+    char                   *set_extended_sensitivity   = NULL;
+    char                   *set_frequency              = NULL;
+    char                   *set_constant_touch_timeout = NULL;
+    bool                    reset_soft                 = false;
+    bool                    reset_hard                 = false;
+    bool                    frequency_check            = false;
+    char                   *linearization_data_load    = NULL;
+    char                   *linearization_data_save    = NULL;
+    bool                    scope                      = false;
+    char                   *scope_file                 = NULL;
+    bool                    scope_stray_correction     = false;
+    bool                    scope_scale_thousands      = false;
+    char                   *firmware_dump              = NULL;
+    char                   *firmware_update            = NULL;
+    bool                    skip_removing_data_backup  = false;
+    char                   *restore_data_backup        = NULL;
+    char                   *validate_fw_file           = NULL;
+    bool                    debug                      = false;
+    int                     ret                        = EXIT_FAILURE;
 
     const struct option longopts[] = {
-        { "list",                      no_argument,       0, 'n' },
-        { "bus-dev",                   required_argument, 0, 's' },
-        { "first",                     no_argument,       0, 'f' },
-        { "info",                      no_argument,       0, 'i' },
-        { "set-identifier",            required_argument, 0, 'I' },
-        { "set-orientation",           required_argument, 0, 'o' },
-        { "set-sensitivity-level",     required_argument, 0, 'l' },
-        { "set-extended-sensitivity",  required_argument, 0, 'L' },
-        { "set-frequency",             required_argument, 0, 'p' },
-        { "reset-soft",                no_argument,       0, 'r' },
-        { "reset-hard",                no_argument,       0, 'R' },
-        { "frequency-check",           no_argument,       0, 'F' },
-        { "linearization-data-load",   required_argument, 0, 'P' },
-        { "linearization-data-save",   required_argument, 0, 'Q' },
-        { "scope",                     no_argument,       0, 'S' },
-        { "scope-file",                required_argument, 0, 'O' },
-        { "scope-stray-correction",    no_argument,       0, 'C' },
-        { "scope-scale-thousands",     no_argument,       0, 'T' },
-        { "firmware-dump",             required_argument, 0, 'x' },
-        { "firmware-update",           required_argument, 0, 'u' },
-        { "restore-data-backup",       required_argument, 0, 'B' },
-        { "skip-removing-data-backup", no_argument,       0, 'N' },
-        { "validate-fw-file",          required_argument, 0, 'z' },
-        { "debug",                     no_argument,       0, 'd' },
-        { "version",                   no_argument,       0, 'v' },
-        { "help",                      no_argument,       0, 'h' },
-        { 0,                           0,                 0, 0   },
+        { "list",                       no_argument,       0, 'n' },
+        { "bus-dev",                    required_argument, 0, 's' },
+        { "first",                      no_argument,       0, 'f' },
+        { "info",                       no_argument,       0, 'i' },
+        { "set-identifier",             required_argument, 0, 'I' },
+        { "set-orientation",            required_argument, 0, 'o' },
+        { "set-sensitivity-level",      required_argument, 0, 'l' },
+        { "set-extended-sensitivity",   required_argument, 0, 'L' },
+        { "set-frequency",              required_argument, 0, 'p' },
+        { "set-constant-touch-timeout", required_argument, 0, 'c' },
+        { "reset-soft",                 no_argument,       0, 'r' },
+        { "reset-hard",                 no_argument,       0, 'R' },
+        { "frequency-check",            no_argument,       0, 'F' },
+        { "linearization-data-load",    required_argument, 0, 'P' },
+        { "linearization-data-save",    required_argument, 0, 'Q' },
+        { "scope",                      no_argument,       0, 'S' },
+        { "scope-file",                 required_argument, 0, 'O' },
+        { "scope-stray-correction",     no_argument,       0, 'C' },
+        { "scope-scale-thousands",      no_argument,       0, 'T' },
+        { "firmware-dump",              required_argument, 0, 'x' },
+        { "firmware-update",            required_argument, 0, 'u' },
+        { "restore-data-backup",        required_argument, 0, 'B' },
+        { "skip-removing-data-backup",  no_argument,       0, 'N' },
+        { "validate-fw-file",           required_argument, 0, 'z' },
+        { "debug",                      no_argument,       0, 'd' },
+        { "version",                    no_argument,       0, 'v' },
+        { "help",                       no_argument,       0, 'h' },
+        { 0,                            0,                 0, 0   },
     };
 
     /* turn off getopt error message */
     opterr = 1;
     while (iarg != -1) {
-        iarg = getopt_long (argc, argv, "ns:fiI:o:l:L:p:rRFP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
+        iarg = getopt_long (argc, argv, "ns:fiI:o:l:L:p:c:rRFP:Q:SO:CTx:u:B:Nz:dhv", longopts, &idx);
         switch (iarg) {
         case 'n':
             list = true;
@@ -2005,6 +2060,9 @@ int main (int argc, char **argv)
             break;
         case 'p':
             set_frequency = strdup (optarg);
+            break;
+        case 'c':
+            set_constant_touch_timeout = strdup (optarg);
             break;
         case 'r':
             reset_soft = true;
@@ -2086,6 +2144,7 @@ int main (int argc, char **argv)
         !!set_sensitivity_level +
         !!set_extended_sensitivity +
         !!set_frequency +
+        !!set_constant_touch_timeout +
         reset_soft +
         reset_hard +
         frequency_check +
@@ -2155,6 +2214,8 @@ int main (int argc, char **argv)
         ret = run_set_extended_sensitivity (ctx, first, bus_number, device_address, set_extended_sensitivity);
     else if (set_frequency)
         ret = run_set_frequency (ctx, first, bus_number, device_address, set_frequency);
+    else if (set_constant_touch_timeout)
+        ret = run_set_constant_touch_timeout (ctx, first, bus_number, device_address, set_constant_touch_timeout);
     else if (reset_soft)
         ret = run_reset (ctx, first, bus_number, device_address, MICROTOUCH3M_DEVICE_RESET_SOFT);
     else if (reset_hard)
@@ -2186,6 +2247,8 @@ out:
     free (firmware_update);
     free (restore_data_backup);
     free (validate_fw_file);
+    free (set_constant_touch_timeout);
+    free (set_frequency);
     free (set_extended_sensitivity);
     free (set_sensitivity_level);
     free (set_orientation);
