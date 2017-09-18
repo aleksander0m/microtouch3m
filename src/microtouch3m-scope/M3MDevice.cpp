@@ -182,8 +182,8 @@ void M3MDevice::get_sensitivity_info()
 
     if ((st = microtouch3m_device_get_sensitivity_level(m_dev, &m_sensitivity_level)) != MICROTOUCH3M_STATUS_OK)
     {
-        throw std::runtime_error("M3M: Couldn't get sensitivity level - "
-                                 + std::string(microtouch3m_status_to_string(st)));
+        /* Set an invalid value, but don't error out */
+        m_sensitivity_level = 0xff;
     }
 
     if ((st = microtouch3m_device_get_extended_sensitivity(m_dev, &m_touchdown, &m_liftoff, &m_palm,

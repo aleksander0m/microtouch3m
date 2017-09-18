@@ -112,9 +112,15 @@ M3MScopeApp::M3MScopeApp(uint32_t width, uint32_t height, uint8_t bits_per_pixel
 
             std::string sensitivity_level;
             {
-                std::ostringstream oss;
-                oss << (int) m3m_dev.sensitivity_level();
-                sensitivity_level = oss.str();
+                int sl;
+
+                sl = m3m_dev.sensitivity_level();
+                if (sl >= MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MIN && sl <= MICROTOUCH3M_DEVICE_SENSITIVITY_LEVEL_MAX) {
+                    std::ostringstream oss;
+                    oss << sl;
+                    sensitivity_level = oss.str();
+                } else
+                    sensitivity_level = "n/a";
             }
             const std::string label_sensitivity_level = "Sensitivity Level: ";
             len_value.push_back(sensitivity_level.length());
