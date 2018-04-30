@@ -1203,8 +1203,8 @@ run_frequency_check (microtouch3m_context_t *ctx,
     printf ("original frequency is: %s\n", microtouch3m_device_frequency_to_string (original_freq));
 
     for (i = 0; i < N_FREQS; i++) {
-        uint64_t pkpk_noise;
-        uint64_t pkst_noise;
+        uint64_t pkpk_noise = 0;
+        uint64_t pkst_noise = 0;
 
         if ((st = run_frequency_check_iteration (dev, freq_id[i].id, &pkpk_noise, &pkst_noise)) != MICROTOUCH3M_STATUS_OK)
             goto out;
