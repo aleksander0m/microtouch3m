@@ -31,6 +31,7 @@
 #include <algorithm>
 
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "Utils.hpp"
 
